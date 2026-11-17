@@ -3,11 +3,12 @@ name: Build
 on:
   push:
     branches: [main]
-    tags: ['v*']
+    # Text-only changes do not need a new APK.
+    paths-ignore: ['**.md', 'LICENSE']
   workflow_dispatch:
 
 permissions:
-  contents: write   # needed to attach the APK to a release for tagged builds
+  contents: write   # needed to publish each build as a release
 
 concurrency:
   group: build-${{ github.ref }}
@@ -77,9 +78,10 @@ jobs:
       - name: Name the APK
         id: apk
         run: |
-          if [ "$GITHUB_REF_TYPE" = "tag" ]; then version="${GITHUB_REF_NAME#v}"; else version="dev"; fi
-          file="step-${version}-build${GITHUB_RUN_NUMBER}.apk"
+          version="$(sed -n 's/^stepVersion=//p' gradle.properties).${GITHUB_RUN_NUMBER}"
+          file="step-${version}.apk"
           cp app/build/outputs/apk/release/app-release.apk "$file"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "file=$file" >> "$GITHUB_OUTPUT"
 
       - uses: actions/upload-artifact@v7
@@ -88,19 +90,17 @@ jobs:
           path: ${{ steps.apk.outputs.file }}
           if-no-files-found: error
 
+      # Every successful build of main becomes a release, so the phone always has a direct
+      # download link. The release creates the tag v<version> on the built commit.
       - name: Publish release
-        if: github.ref_type == 'tag'
+        if: github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.apk.outputs.version }}
           APK_FILE: ${{ steps.apk.outputs.file }}
-        # The tag may come from a plain "git push" or from a release drafted on github.com.
-        # In the second case the release already exists and only needs the APK attached.
         run: |
-          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" "$APK_FILE" --clobber
-          else
-            gh release create "$GITHUB_REF_NAME" "$APK_FILE" --title "Step ${GITHUB_REF_NAME#v}" --generate-notes
-          fi
+          gh release create "v$VERSION" "$APK_FILE" --target "$GITHUB_SHA" --title "Step $VERSION" --generate-notes
+          echo "::notice::Published release v$VERSION"
 
       - name: Remove keystore
         if: always()
