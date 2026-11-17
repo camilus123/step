@@ -64,9 +64,11 @@ jobs:
       - name: Verify signature
         run: |
           apksigner="$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -n 1)"
+          # The label in front of the digest differs between apksigner versions
+          # ("Signer #1 ..." or "Signer (minSdkVersion=...) ..."), so match only the common part.
           actual="$("$apksigner" verify --print-certs app/build/outputs/apk/release/app-release.apk \
-            | sed -n 's/^Signer #1 certificate SHA-256 digest: //p')"
-          echo "Signing certificate SHA-256: $actual"
+            | grep -oiE 'certificate SHA-256 digest: [0-9a-f]{64}' | head -n 1 | grep -oE '[0-9a-f]{64}$' || true)"
+          echo "::notice::Signing certificate SHA-256: ${actual:-not found} ($(basename "$(dirname "$apksigner")"))"
           if [ "$actual" != "$EXPECTED_CERT_SHA256" ]; then
             echo "::error::APK is not signed with the expected release key."
             exit 1
