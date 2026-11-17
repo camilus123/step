@@ -90,7 +90,15 @@ jobs:
         if: github.ref_type == 'tag'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" "${{ steps.apk.outputs.file }}" --title "Step ${GITHUB_REF_NAME#v}" --generate-notes
+          APK_FILE: ${{ steps.apk.outputs.file }}
+        # The tag may come from a plain "git push" or from a release drafted on github.com.
+        # In the second case the release already exists and only needs the APK attached.
+        run: |
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "$APK_FILE" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" "$APK_FILE" --title "Step ${GITHUB_REF_NAME#v}" --generate-notes
+          fi
 
       - name: Remove keystore
         if: always()
