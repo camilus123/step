@@ -13,25 +13,34 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import si.marko.step.MainViewModel
 import si.marko.step.R
+import si.marko.step.core.Goal
 import si.marko.step.diag.DiagSection
-import si.marko.step.diag.EventLog
 import java.text.NumberFormat
-import java.time.Instant
-import java.time.ZoneId
+
+/** Green that reads well on both light and dark surfaces. */
+private val GoalReachedGreen = Color(0xFF2E9E4F)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -39,19 +48,19 @@ fun DiagnosticsScreen(
     vm: MainViewModel,
     onRequestPermissions: () -> Unit,
     onOpenAppSettings: () -> Unit,
+    onAllowBackground: () -> Unit,
     onCopy: (String) -> Unit,
 ) {
-    // Reading these makes the report rebuild whenever any of them changes.
-    val reading = vm.reading
+    val steps by vm.todaySteps.collectAsState(initial = 0L)
+    val running by vm.serviceRunning.collectAsState()
     val tick = vm.refreshTick
-    val events = vm.events
-    val listening = vm.listening
-    val report = remember(reading, tick, events, listening) { vm.buildReport() }
     val numbers = remember { NumberFormat.getIntegerInstance() }
+    val scope = rememberCoroutineScope()
 
-    Scaffold(
-        topBar = { TopAppBar(title = { Text(stringResource(R.string.app_name) + " · " + stringResource(R.string.stage1_title)) }) },
-    ) { padding ->
+    // Keep the diagnostics in step with what is shown above them.
+    LaunchedEffect(steps, running) { vm.refresh() }
+
+    Scaffold(topBar = { TopAppBar(title = { Text(stringResource(R.string.app_name)) }) }) { padding ->
         LazyColumn(
             modifier = Modifier.padding(padding),
             contentPadding = PaddingValues(16.dp),
@@ -62,31 +71,33 @@ fun DiagnosticsScreen(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
                 ) {
-                    Column(Modifier.padding(20.dp)) {
-                        Text(stringResource(R.string.raw_value_label), style = MaterialTheme.typography.labelLarge)
-                        Text(
-                            text = when {
-                                !vm.hasSensor -> stringResource(R.string.raw_value_no_sensor)
-                                !vm.canReadSensor -> stringResource(R.string.raw_value_no_permission)
-                                reading == null -> stringResource(R.string.raw_value_waiting)
-                                else -> numbers.format(reading.rawSteps)
-                            },
-                            style = if (reading != null) MaterialTheme.typography.displayMedium else MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                        val first = vm.firstRawThisSession
-                        if (reading != null && first != null) {
-                            Text(stringResource(R.string.session_steps, numbers.format(reading.rawSteps - first)))
+                    Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(stringResource(R.string.today), style = MaterialTheme.typography.labelLarge)
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             Text(
-                                stringResource(
-                                    R.string.last_reading,
-                                    EventLog.TIME_FORMAT.format(
-                                        Instant.ofEpochMilli(reading.eventWallMillis).atZone(ZoneId.systemDefault())
-                                    ),
-                                ),
-                                style = MaterialTheme.typography.bodySmall,
+                                text = numbers.format(steps),
+                                style = MaterialTheme.typography.displayLarge,
+                                fontWeight = FontWeight.SemiBold,
                             )
+                            if (Goal.reached(steps, vm.goal)) {
+                                Text(
+                                    stringResource(R.string.goal_reached_mark),
+                                    style = MaterialTheme.typography.displayMedium,
+                                    color = GoalReachedGreen,
+                                    fontWeight = FontWeight.Bold,
+                                )
+                            }
                         }
+                        LinearProgressIndicator(
+                            progress = { (steps.toFloat() / vm.goal).coerceIn(0f, 1f) },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Text(stringResource(R.string.goal_progress, Goal.percent(steps, vm.goal), numbers.format(vm.goal)))
+                        Text(
+                            stringResource(if (running) R.string.status_counting else R.string.status_not_counting),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (running) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.error,
+                        )
                     }
                 }
             }
@@ -95,7 +106,7 @@ fun DiagnosticsScreen(
                 item { Text(stringResource(R.string.no_sensor_message), color = MaterialTheme.colorScheme.error) }
             }
 
-            // "tick" is read above, so this is re-evaluated after every permission change.
+            // "tick" is read here so these blocks are re-evaluated after every return to the app.
             if (tick >= 0 && vm.missingPermissions().isNotEmpty()) {
                 item {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -108,22 +119,33 @@ fun DiagnosticsScreen(
                 }
             }
 
+            if (tick >= 0 && !vm.isExemptFromBatteryOptimisation()) {
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(stringResource(R.string.battery_explanation))
+                        Button(onClick = onAllowBackground) { Text(stringResource(R.string.allow_background)) }
+                    }
+                }
+            }
+
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = { onCopy(vm.buildReport().toText()) }) { Text(stringResource(R.string.copy_diagnostics)) }
+                    Button(onClick = { scope.launch { onCopy(vm.buildReport().toText()) } }) {
+                        Text(stringResource(R.string.copy_diagnostics))
+                    }
                     OutlinedButton(onClick = vm::refresh) { Text(stringResource(R.string.refresh)) }
                 }
             }
 
             item { Text(stringResource(R.string.diagnostics_title), style = MaterialTheme.typography.titleLarge) }
-            items(report.sections) { SectionCard(it) }
+            items(vm.report.sections) { SectionCard(it) }
 
             item { Text(stringResource(R.string.events_title), style = MaterialTheme.typography.titleLarge) }
-            if (report.events.isEmpty()) {
+            if (vm.report.events.isEmpty()) {
                 item { Text(stringResource(R.string.events_empty)) }
             } else {
                 // Newest first on screen; the copied text keeps chronological order.
-                items(report.events.asReversed()) {
+                items(vm.report.events.asReversed()) {
                     Text(it, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace)
                 }
             }

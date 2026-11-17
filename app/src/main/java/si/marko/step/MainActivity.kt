@@ -1,5 +1,6 @@
 package si.marko.step
 
+import android.annotation.SuppressLint
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Intent
@@ -32,6 +33,7 @@ class MainActivity : ComponentActivity() {
                     vm = vm,
                     onRequestPermissions = { permissionLauncher.launch(vm.missingPermissions()) },
                     onOpenAppSettings = ::openAppSettings,
+                    onAllowBackground = ::requestBatteryExemption,
                     onCopy = ::copyToClipboard,
                 )
             }
@@ -40,13 +42,18 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
-        // Also picks up permissions that were granted in system settings while we were away.
-        vm.startListening()
+        // Starts the counting service if it is not running, and picks up permissions or
+        // settings that were changed in system settings while we were away.
+        vm.onForeground()
     }
 
-    override fun onStop() {
-        vm.stopListening()
-        super.onStop()
+    /** Shows the system dialog that exempts the app from battery optimisation. */
+    @SuppressLint("BatteryLife") // Sideloaded personal app; counting all day is its whole purpose.
+    private fun requestBatteryExemption() {
+        val direct = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.fromParts("package", packageName, null))
+        runCatching { startActivity(direct) }
+            .recoverCatching { startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) }
+            .onFailure { openAppSettings() }
     }
 
     private fun openAppSettings() {

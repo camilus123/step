@@ -2,19 +2,28 @@
 <resources>
     <string name="app_name">Step</string>
 
-    <string name="stage1_title">Sensor check</string>
-    <string name="raw_value_label">Raw sensor value (steps since boot)</string>
-    <string name="raw_value_waiting">Waiting for the first reading…</string>
-    <string name="raw_value_no_permission">Permission needed</string>
-    <string name="raw_value_no_sensor">No step counter sensor</string>
-    <string name="session_steps">%1$s steps since this app was opened</string>
-    <string name="last_reading">Last reading: %1$s</string>
+    <!-- Step count, shared by the screen and the notification -->
+    <string name="steps_count">%1$s steps</string>
+    <string name="goal_progress">%1$d %% of %2$s</string>
+    <string name="goal_reached_prefix">✓ %1$s</string>
+    <string name="today">Today</string>
+    <string name="goal_reached_mark">✓</string>
 
-    <string name="no_sensor_message">This phone does not report a step counter sensor, so the app cannot count steps yet. Please copy the diagnostics below and send them over.</string>
-    <string name="permission_explanation">Android only lets an app read the step sensor after you allow \"Physical activity\". Notifications are needed later for the step count on the lock screen.</string>
+    <!-- Notification channel -->
+    <string name="channel_steps_name">Step count</string>
+    <string name="channel_steps_description">Silent, always-on notification with today\'s steps. It also keeps counting alive in the background.</string>
+
+    <!-- Status and setup -->
+    <string name="status_counting">Counting in the background</string>
+    <string name="status_not_counting">Not counting</string>
+    <string name="no_sensor_message">This phone does not report a step counter sensor, so the app cannot count steps. Please copy the diagnostics below and send them over.</string>
+    <string name="permission_explanation">Android only lets an app read the step sensor after you allow \"Physical activity\". Notifications are needed for the step count on the lock screen.</string>
     <string name="grant_permissions">Grant permissions</string>
     <string name="open_app_settings">Open app settings</string>
+    <string name="battery_explanation">Phones stop background apps to save battery. Allowing background activity keeps the count running and lets the app restart counting by itself if the system stops it.</string>
+    <string name="allow_background">Allow background activity</string>
 
+    <!-- Diagnostics -->
     <string name="diagnostics_title">Diagnostics</string>
     <string name="copy_diagnostics">Copy diagnostics</string>
     <string name="refresh">Refresh</string>
