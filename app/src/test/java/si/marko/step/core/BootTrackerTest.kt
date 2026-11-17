@@ -1,4 +1,4 @@
-package si.marko.step.diag
+package si.marko.step.core
 
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

@@ -1,14 +1,13 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.ksp)
 }
 
 // Version code: the CI run number, so every build installs cleanly over the previous one.
-// Version name: the tag (v0.1 -> 0.1) for tagged builds, otherwise "dev-<run number>".
+// Version name: stepVersion from gradle.properties plus the run number, e.g. 0.2.6.
 val runNumber = providers.environmentVariable("GITHUB_RUN_NUMBER").orNull?.toIntOrNull()
-val tagName = providers.environmentVariable("GITHUB_REF_NAME").orNull
-    ?.takeIf { providers.environmentVariable("GITHUB_REF_TYPE").orNull == "tag" }
-    ?.removePrefix("v")
+val stepVersion = providers.gradleProperty("stepVersion").get()
 
 // Signing: supplied through environment variables (GitHub Actions secrets in CI).
 // Without them the release build is left unsigned and cannot be installed, on purpose:
@@ -26,7 +25,7 @@ android {
         minSdk = 29
         targetSdk = 36
         versionCode = runNumber ?: 1
-        versionName = tagName ?: "dev-${runNumber ?: "local"}"
+        versionName = "$stepVersion.${runNumber ?: "local"}"
     }
 
     signingConfigs {
@@ -66,6 +65,11 @@ dependencies {
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.material3)
+
+    implementation(libs.androidx.room.runtime)
+    ksp(libs.androidx.room.compiler)
+    implementation(libs.androidx.work.runtime)
+    implementation(libs.kotlinx.coroutines.android)
 
     testImplementation(libs.junit)
 }

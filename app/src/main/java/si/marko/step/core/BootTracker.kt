@@ -1,4 +1,4 @@
-package si.marko.step.diag
+package si.marko.step.core
 
 import kotlin.math.abs
 
