@@ -11,20 +11,23 @@ The app is being built in stages, each delivered as an installable APK.
 
 | Stage | Contents | State |
 |---|---|---|
-| 1 | Project skeleton, signed CI build, raw sensor readout, diagnostics | **this build** |
-| 2 | Background service, storage, correct counting, lock screen notification | planned |
+| 1 | Project skeleton, signed CI build, raw sensor readout, diagnostics | done, confirmed on the 17T |
+| 2 | Background service, storage, correct counting, lock screen notification | **this build** |
 | 3 | Home screen widget | planned |
 | 4 | Statistics per week, month and year | planned |
-| 5 | Daily goal, export and import, HyperOS setup guide, polish | planned |
+| 5 | Daily goal setting, export and import, HyperOS setup guide, polish | planned |
 
-### What stage 1 does
+### What works now
 
-It opens to a single screen that shows the phone's raw step counter value (steps since the last
-boot) while the app is open, plus diagnostics: whether the sensor exists and who made it, the
-last reading and how old it was on arrival, permission states, boot information and a short log
-of events. **Copy diagnostics** puts all of it on the clipboard as text.
+- Steps are counted all day by a foreground service and stored in hourly buckets.
+- A silent ongoing notification shows today's steps, the percentage of the goal and a progress
+  bar, also on the lock screen. A check mark appears once the goal is reached.
+- Counting restarts after a reboot and after an app update, and a watchdog checks every half
+  hour that it is still running.
+- The app screen shows today's count and goal progress, plus diagnostics with a
+  **Copy diagnostics** button.
 
-It does not yet count in the background, store history or show a notification.
+The goal is fixed at 10 000 steps until settings arrive in stage 5.
 
 ## Download and install
 
@@ -34,31 +37,47 @@ It does not yet count in the background, store history or show a notification.
    manager to install apps; allow it.
 3. Later versions install straight over the old one and keep all data. Do not uninstall first.
 
-Every push to `main` also produces an APK as a workflow artifact (Actions tab), but artifacts
-need a GitHub login and arrive zipped, so Releases are the comfortable route.
+Every successful build is published there automatically. Version numbers look like `0.2.6`:
+the stage, then a build number that only ever goes up.
 
 ## HyperOS settings to change by hand
 
-Not needed for stage 1. From stage 2 on, HyperOS has to be told to leave the app alone:
-autostart allowed, battery saver set to "No restrictions", the app locked in recent apps, and
-lock screen notifications enabled with content shown. The app will walk through these, and this
-section will list the exact menu paths once they are confirmed on the phone.
+HyperOS stops background apps aggressively. These settings tell it to leave Step alone. The menu
+names below are the usual HyperOS ones and still need confirming on HyperOS 3.
+
+1. **Background activity:** in the app, tap **Allow background activity** and confirm. This also
+   lets the app restart counting by itself.
+2. **Autostart:** Settings → Apps → Manage apps → Step → Autostart: on. Without it the app is not
+   started after a reboot.
+3. **Battery saver:** Settings → Apps → Manage apps → Step → Battery saver → No restrictions.
+4. **Lock in recent apps:** open recent apps, long-press the Step card, tap the padlock.
+5. **Lock screen notification:** Settings → Notifications & status bar → Lock screen
+   notifications: show notifications and their content, and make sure Step is allowed.
 
 ## Counting rules
 
-Implemented from stage 2; these are the rules it will follow.
-
 - **Source:** the hardware step counter (`TYPE_STEP_COUNTER`), which counts cumulatively since
   boot even while the app is not running. The app stores differences between readings.
-- **Storage:** hourly buckets. Days, weeks, months and years are sums over them.
-- **Midnight and hour boundaries:** each reading carries the sensor's own timestamp, so steps
-  land in the hour they were taken, including steps delivered late in a batch.
-- **Gaps (the service was not running for a while):** the steps taken in the gap are never
-  dropped. They are spread evenly over the hours between the last reading and the new one,
-  limited to the current and the previous day.
-- **Reboot:** the counter restarts from zero. The app detects the reboot and starts a new
-  baseline; steps counted since boot are credited from the boot time onward.
+- **Storage:** hourly buckets. Days, weeks, months and years are sums over them. A bucket belongs
+  to the local date and hour at the time of recording, so travelling to another time zone does
+  not move old steps to a different day.
+- **First start:** the first reading only sets the baseline. Steps walked before the app first
+  saw the sensor are not counted.
+- **Midnight and hour boundaries:** the steps between two readings are spread evenly over the
+  time between them and cut at hour boundaries. While the app is counting, that time is a few
+  seconds, so steps land in the hour, and on the day, they were walked.
+- **Gaps (counting was stopped for a while):** the steps taken in the gap are never dropped. They
+  are spread evenly over the gap, reaching back no further than the start of the previous day.
+  On the 17T the sensor stamps each reading with the time of the last counted step, so a gap
+  ends where the walking ended, not where the app woke up.
+- **Reboot:** the counter restarts from zero. The app detects the reboot through Android's boot
+  counter and starts a new baseline; steps counted since boot are credited from the boot time
+  onward. Steps walked after the last reading before a shutdown are lost if counting was stopped
+  at that moment.
 - **Conventions:** metric, 24-hour time, weeks start on Monday.
+
+The rules live in `app/src/main/java/si/marko/step/core/StepAccountant.kt` and are covered by
+unit tests.
 
 ## Export and import
 
@@ -69,8 +88,9 @@ picker, and import of the same JSON format.
 
 Builds run on GitHub Actions (`.github/workflows/build.yml`); nothing needs to be installed on
 a PC. Each run executes the unit tests, builds a signed release APK and checks that it is signed
-with the expected key. Tags of the form `v*` also publish a GitHub Release with the APK attached.
-The version code is the workflow run number, so every build is newer than the last.
+with the expected key, then publishes it as a GitHub Release. The version code is the workflow
+run number, so every build is newer than the last. The stage number lives in `gradle.properties`
+(`stepVersion`).
 
 ### Signing
 
