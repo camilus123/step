@@ -5,7 +5,7 @@
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
     <!-- The step count on the lock screen is a notification. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <!-- Lets the step notification ask to be an Android 16 "live update" (optional, off by default). -->
+    <!-- Lets the step notification be an Android 16 "live update": always-on display and status bar chip. -->
     <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
     <!-- Counting all day needs a foreground service of the "health" type. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
@@ -41,6 +41,18 @@
             android:name=".service.StepService"
             android:exported="false"
             android:foregroundServiceType="health" />
+
+        <receiver
+            android:name=".widget.StepWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/step_widget_info" />
+        </receiver>
 
         <receiver
             android:name=".service.BootReceiver"

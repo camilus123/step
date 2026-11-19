@@ -13,5 +13,4 @@ object ServiceStatus {
     @Volatile var listenerRegistered: Boolean = false
     @Volatile var readingsThisRun: Long = 0
     @Volatile var notificationUpdates: Long = 0
-    @Volatile var reposts: Long = 0
 }

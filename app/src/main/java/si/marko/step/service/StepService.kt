@@ -7,7 +7,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.Build
@@ -29,13 +28,14 @@ import si.marko.step.AppGraph
 import si.marko.step.core.Goal
 import si.marko.step.sensor.SensorReading
 import si.marko.step.sensor.StepSensorReader
+import si.marko.step.widget.StepWidget
 import java.time.Duration
 import java.time.ZoneId
 import java.time.ZonedDateTime
 
 /**
  * The foreground service that keeps counting all day. It listens to the step counter, hands
- * every reading to the repository and keeps the ongoing notification up to date.
+ * every reading to the repository and keeps the ongoing notification and the widget up to date.
  *
  * If the system kills it, nothing is lost: the sensor keeps its cumulative count, and the next
  * reading after a restart includes the steps walked in between.
@@ -49,24 +49,10 @@ class StepService : Service() {
     private lateinit var day: MutableStateFlow<Long>
     private var begun = false
 
-    /** Which of the two notification ids is in use right now. */
-    @Volatile
-    private var notificationId = StepNotification.NOTIFICATION_ID_A
-
     private val clockChanged = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             day.value = graph.repository.todayEpochDay()
         }
-    }
-
-    private val screenOff = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) {
-            if (LockScreenOptions.load(graph.prefs).repostOnScreenOff) repost("screen off")
-        }
-    }
-
-    private val optionsChanged = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-        if (key in LockScreenOptions.KEYS) repost("options changed")
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -76,14 +62,14 @@ class StepService : Service() {
         graph = AppGraph.get(this)
         day = MutableStateFlow(graph.repository.todayEpochDay())
         reader = StepSensorReader(this) { readings.trySend(it) }
-        StepNotification.ensureChannels(this)
+        StepNotification.ensureChannel(this)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val reason = intent?.getStringExtra(EXTRA_REASON) ?: "restarted by the system"
         try {
             // The real count replaces this placeholder within moments.
-            enterForeground(notificationId)
+            enterForeground()
         } catch (e: Exception) {
             graph.log.add("Service could not enter the foreground ($reason): ${e.javaClass.simpleName}: ${e.message}")
             stopSelf()
@@ -96,32 +82,13 @@ class StepService : Service() {
         return START_STICKY
     }
 
-    private fun buildNotification() =
-        StepNotification.build(this, lastShownSteps, Goal.DEFAULT, LockScreenOptions.load(graph.prefs))
+    private fun buildNotification() = StepNotification.build(this, lastShownSteps, Goal.DEFAULT)
 
-    private fun enterForeground(id: Int) {
+    private fun enterForeground() {
         if (Build.VERSION.SDK_INT >= 34) {
-            startForeground(id, buildNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_HEALTH)
+            startForeground(StepNotification.NOTIFICATION_ID, buildNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_HEALTH)
         } else {
-            startForeground(id, buildNotification())
-        }
-    }
-
-    /**
-     * Posts the notification as a brand new one (under the other id) and removes the old one.
-     * To the system this is a notification that has just arrived, which matters on lock
-     * screens that only list what came in since the last unlock.
-     */
-    private fun repost(why: String) {
-        val oldId = notificationId
-        val newId = if (oldId == StepNotification.NOTIFICATION_ID_A) StepNotification.NOTIFICATION_ID_B else StepNotification.NOTIFICATION_ID_A
-        try {
-            enterForeground(newId)
-            notificationId = newId
-            getSystemService(NotificationManager::class.java).cancel(oldId)
-            ServiceStatus.reposts++
-        } catch (e: Exception) {
-            graph.log.add("Posting the notification afresh failed ($why): ${e.javaClass.simpleName}: ${e.message}")
+            startForeground(StepNotification.NOTIFICATION_ID, buildNotification())
         }
     }
 
@@ -131,7 +98,6 @@ class StepService : Service() {
         ServiceStatus.startReason = reason
         ServiceStatus.readingsThisRun = 0
         ServiceStatus.notificationUpdates = 0
-        ServiceStatus.reposts = 0
         ServiceStatus.running.value = true
 
         val registered = reader.start(MAX_REPORT_LATENCY_MICROS)
@@ -155,7 +121,7 @@ class StepService : Service() {
             }
         }
 
-        // Notification: follows today's total, at most one update per interval. "conflate"
+        // Notification and widget: follow today's total, at most one update per interval. "conflate"
         // keeps only the newest value while waiting, so the final count is always shown.
         scope.launch {
             day.flatMapLatest { graph.repository.dayTotal(it) }
@@ -163,7 +129,8 @@ class StepService : Service() {
                 .conflate()
                 .collect { steps ->
                     lastShownSteps = steps
-                    getSystemService(NotificationManager::class.java).notify(notificationId, buildNotification())
+                    getSystemService(NotificationManager::class.java).notify(StepNotification.NOTIFICATION_ID, buildNotification())
+                    StepWidget.show(this@StepService, steps)
                     ServiceStatus.notificationUpdates++
                     delay(NOTIFICATION_MIN_INTERVAL_MS)
                 }
@@ -183,8 +150,6 @@ class StepService : Service() {
             },
             ContextCompat.RECEIVER_NOT_EXPORTED,
         )
-        ContextCompat.registerReceiver(this, screenOff, IntentFilter(Intent.ACTION_SCREEN_OFF), ContextCompat.RECEIVER_NOT_EXPORTED)
-        graph.prefs.registerOnSharedPreferenceChangeListener(optionsChanged)
         scope.launch {
             while (true) {
                 val now = ZonedDateTime.now(ZoneId.systemDefault())
@@ -206,8 +171,6 @@ class StepService : Service() {
         if (begun) {
             reader.stop()
             runCatching { unregisterReceiver(clockChanged) }
-            runCatching { unregisterReceiver(screenOff) }
-            graph.prefs.unregisterOnSharedPreferenceChangeListener(optionsChanged)
             graph.log.add("Service destroyed")
         }
         ServiceStatus.running.value = false

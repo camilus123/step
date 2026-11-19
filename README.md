@@ -12,8 +12,8 @@ The app is being built in stages, each delivered as an installable APK.
 | Stage | Contents | State |
 |---|---|---|
 | 1 | Project skeleton, signed CI build, raw sensor readout, diagnostics | done, confirmed on the 17T |
-| 2 | Background service, storage, correct counting, lock screen notification | **this build** |
-| 3 | Home screen widget | planned |
+| 2 | Background service, storage, correct counting, lock screen notification | done, confirmed on the 17T |
+| 3 | Home screen widget | **this build** |
 | 4 | Statistics per week, month and year | planned |
 | 5 | Daily goal setting, export and import, HyperOS setup guide, polish | planned |
 
@@ -21,8 +21,10 @@ The app is being built in stages, each delivered as an installable APK.
 
 - Steps are counted all day by a foreground service and stored in hourly buckets.
 - An ongoing notification without sound shows today's steps, the percentage of the goal and a
-  progress bar. A check mark appears once the goal is reached. Getting it onto the HyperOS lock
-  screen is still being worked out; the app has three switches for trying different ways.
+  progress bar, on the lock screen and on the always-on display. A check mark appears once the
+  goal is reached. The status bar shows the step count as a small chip.
+- A resizable home screen widget shows today's steps; from two cells wide it adds the goal
+  percentage and a progress bar. It follows the system colours and light or dark mode.
 - Counting restarts after a reboot and after an app update, and a watchdog checks every half
   hour that it is still running.
 - The app screen shows today's count and goal progress, plus diagnostics with a
@@ -52,8 +54,22 @@ names below are the usual HyperOS ones and still need confirming on HyperOS 3.
    started after a reboot.
 3. **Battery saver:** Settings → Apps → Manage apps → Step → Battery saver → No restrictions.
 4. **Lock in recent apps:** open recent apps, long-press the Step card, tap the padlock.
-5. **Lock screen notification:** Settings → Notifications & status bar → Lock screen
-   notifications: show notifications and their content, and make sure Step is allowed.
+5. **Lock screen notification:** in the app's notification settings, keep "Lock screen
+   notifications" on, and under Notification categories → Step count set "On the Lock screen" to
+   "Show all notifications and their contents". Keep "Notification spotlight" on: it is what puts
+   the count on the always-on display.
+
+What the 17T taught us about the lock screen: HyperOS 3 hides low-importance ("silent")
+notifications there regardless of these settings, so the step notification has normal importance
+with sound and vibration switched off; and only an Android 16 live update shows on the always-on
+display.
+
+## Widget
+
+Long-press the home screen, open the widget picker and look for **Step** (third-party widgets
+are usually listed under "Android widgets"). It starts two cells wide and can be resized down to
+one cell, where it shows only the number, or made larger. Tapping it opens the app. The counting
+service updates it whenever the count changes, at most every five seconds, and at midnight.
 
 ## Counting rules
 

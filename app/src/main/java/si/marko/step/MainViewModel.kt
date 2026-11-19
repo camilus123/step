@@ -27,10 +27,10 @@ import si.marko.step.core.Goal
 import si.marko.step.diag.DiagSection
 import si.marko.step.diag.DiagnosticsReport
 import si.marko.step.diag.EventLog
-import si.marko.step.service.LockScreenOptions
 import si.marko.step.service.ServiceStatus
 import si.marko.step.service.StepNotification
 import si.marko.step.service.StepService
+import si.marko.step.widget.StepWidget
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -132,24 +132,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 .getOrDefault("unknown")
         } else "needs Android 16"
 
-    // ---- lock screen options -----------------------------------------------------------
-
-    var lockScreenOptions by mutableStateOf(LockScreenOptions.load(graph.prefs))
-        private set
-
-    fun changeLockScreenOptions(options: LockScreenOptions) {
-        if (options == lockScreenOptions) return
-        lockScreenOptions = options
-        options.save(graph.prefs) // the service listens for this and posts the notification afresh
-        graph.log.add(
-            "Lock screen options: normal importance ${onOff(options.normalImportance)}, " +
-                "post afresh on screen off ${onOff(options.repostOnScreenOff)}, live update ${onOff(options.liveUpdate)}"
-        )
-        refresh()
-    }
-
-    private fun onOff(value: Boolean) = if (value) "on" else "off"
-
     suspend fun buildReport(): DiagnosticsReport {
         val app = getApplication<Application>()
         val reading = ServiceStatus.lastReading.value
@@ -198,7 +180,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     "Sensor listener registered" to yesNo(ServiceStatus.listenerRegistered),
                     "Readings this run" to ServiceStatus.readingsThisRun.toString(),
                     "Notification updates this run" to ServiceStatus.notificationUpdates.toString(),
-                    "Posted afresh this run" to ServiceStatus.reposts.toString(),
+                    "Home screen widgets placed" to StepWidget.count(app).toString(),
                 ),
             ),
             DiagSection(
@@ -230,12 +212,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                         if (Build.VERSION.SDK_INT >= 33) grantText(Manifest.permission.POST_NOTIFICATIONS)
                         else "not needed on this Android version",
                     "Notifications enabled" to yesNo(NotificationManagerCompat.from(app).areNotificationsEnabled()),
-                    "Channel in use" to StepNotification.channelFor(lockScreenOptions),
-                    "Channel steps" to channelText(app, StepNotification.CHANNEL_SILENT),
-                    "Channel steps_lockscreen" to channelText(app, StepNotification.CHANNEL_NORMAL),
-                    "Option: normal importance" to onOff(lockScreenOptions.normalImportance),
-                    "Option: post afresh on screen off" to onOff(lockScreenOptions.repostOnScreenOff),
-                    "Option: live update" to onOff(lockScreenOptions.liveUpdate),
+                    "Notification channel" to channelText(app, StepNotification.CHANNEL_ID),
                     "Live updates allowed by system" to liveUpdateAllowed(app),
                     "Exempt from battery optimisation" to yesNo(isExemptFromBatteryOptimisation()),
                     "App standby bucket" to standbyBucket(app),

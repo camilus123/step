@@ -8,6 +8,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import si.marko.step.AppGraph
 import si.marko.step.sensor.StepSensorReader
+import si.marko.step.widget.StepWidget
 import java.util.concurrent.TimeUnit
 
 /**
@@ -23,11 +24,14 @@ class WatchdogWorker(context: Context, params: WorkerParameters) : CoroutineWork
     override suspend fun doWork(): Result {
         if (ServiceStatus.running.value) return Result.success()
         val graph = AppGraph.get(applicationContext)
+        // Whatever happens below, the widget should not keep showing a stale number.
+        runCatching { StepWidget.refreshFromDatabase(applicationContext) }
         if (!StepService.canRun(applicationContext)) return Result.success()
 
         val reading = StepSensorReader.readOnce(applicationContext)
         if (reading != null) {
             runCatching { graph.repository.record(reading, graph.boot, "watchdog") }
+            runCatching { StepWidget.refreshFromDatabase(applicationContext) }
         }
         val accepted = StepService.start(applicationContext, "watchdog found it stopped")
         graph.log.add(

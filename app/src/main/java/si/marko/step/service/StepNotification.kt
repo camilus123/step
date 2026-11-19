@@ -12,40 +12,35 @@ import si.marko.step.R
 import si.marko.step.core.Goal
 import java.text.NumberFormat
 
-/** The ongoing notification that shows today's steps, also on the lock screen. Never audible. */
+/**
+ * The ongoing notification that shows today's steps. Never audible.
+ *
+ * What it takes to be visible on a locked Xiaomi 17T (HyperOS 3), found by trying on the phone:
+ *
+ * - Normal importance. As a "silent" (low importance) notification it is hidden on the lock
+ *   screen, whatever the lock screen settings say. So the channel has normal importance with
+ *   sound and vibration switched off on the channel itself.
+ * - An Android 16 "live update" request. That is what puts it on the always-on display (clock on
+ *   a black screen); it also turns the status bar icon into a chip with the step count.
+ *
+ * Posting it afresh whenever the screen turns off was tried as well and made no difference.
+ */
 object StepNotification {
-    /** Low importance: what Android calls a silent notification. */
-    const val CHANNEL_SILENT = "steps"
+    const val CHANNEL_ID = "steps_lockscreen"
+    const val NOTIFICATION_ID = 1
 
-    /** Normal importance with sound and vibration switched off on the channel itself. */
-    const val CHANNEL_NORMAL = "steps_lockscreen"
+    /** Channel of the first builds (low importance). Removed on start if it still exists. */
+    private const val OLD_SILENT_CHANNEL_ID = "steps"
 
-    /** The service alternates between these two ids when it posts the notification afresh. */
-    const val NOTIFICATION_ID_A = 1
-    const val NOTIFICATION_ID_B = 2
-
-    fun channelFor(options: LockScreenOptions) = if (options.normalImportance) CHANNEL_NORMAL else CHANNEL_SILENT
-
-    fun ensureChannels(context: Context) {
+    fun ensureChannel(context: Context) {
         val manager = context.getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(
             NotificationChannel(
-                CHANNEL_SILENT,
+                CHANNEL_ID,
                 context.getString(R.string.channel_steps_name),
-                NotificationManager.IMPORTANCE_LOW,
-            ).apply {
-                description = context.getString(R.string.channel_steps_description)
-                setShowBadge(false)
-                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
-            }
-        )
-        manager.createNotificationChannel(
-            NotificationChannel(
-                CHANNEL_NORMAL,
-                context.getString(R.string.channel_steps_lock_name),
                 NotificationManager.IMPORTANCE_DEFAULT,
             ).apply {
-                description = context.getString(R.string.channel_steps_lock_description)
+                description = context.getString(R.string.channel_steps_description)
                 setShowBadge(false)
                 setSound(null, null)
                 enableVibration(false)
@@ -53,6 +48,9 @@ object StepNotification {
                 lockscreenVisibility = Notification.VISIBILITY_PUBLIC
             }
         )
+        // Android refuses while a foreground service still shows a notification on it; then
+        // the next start gets it.
+        runCatching { manager.deleteNotificationChannel(OLD_SILENT_CHANNEL_ID) }
     }
 
     fun title(context: Context, steps: Long, goal: Int): String {
@@ -67,14 +65,14 @@ object StepNotification {
             NumberFormat.getIntegerInstance().format(goal),
         )
 
-    fun build(context: Context, steps: Long, goal: Int, options: LockScreenOptions): Notification {
+    fun build(context: Context, steps: Long, goal: Int): Notification {
         val openApp = PendingIntent.getActivity(
             context,
             0,
             Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
-        val builder = NotificationCompat.Builder(context, channelFor(options))
+        return NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_steps)
             .setContentTitle(title(context, steps, goal))
             .setContentText(subtitle(context, steps, goal))
@@ -85,15 +83,12 @@ object StepNotification {
             .setShowWhen(false)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setCategory(NotificationCompat.CATEGORY_STATUS)
-            .setPriority(if (options.normalImportance) NotificationCompat.PRIORITY_DEFAULT else NotificationCompat.PRIORITY_LOW)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             // Show at once instead of after the default delay for foreground services.
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
-        if (!options.normalImportance) builder.setSilent(true)
-        if (options.liveUpdate) {
-            builder.setRequestPromotedOngoing(true)
-            // The text of the status bar chip: just the number.
-            builder.setShortCriticalText(NumberFormat.getIntegerInstance().format(steps))
-        }
-        return builder.build()
+            // Live update: lock screen and always-on display. The chip text is just the number.
+            .setRequestPromotedOngoing(true)
+            .setShortCriticalText(NumberFormat.getIntegerInstance().format(steps))
+            .build()
     }
 }

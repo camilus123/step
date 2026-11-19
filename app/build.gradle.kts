@@ -70,6 +70,7 @@ dependencies {
     ksp(libs.androidx.room.compiler)
     implementation(libs.androidx.work.runtime)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.androidx.glance.appwidget)
 
     testImplementation(libs.junit)
 }
