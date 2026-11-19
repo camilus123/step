@@ -23,8 +23,8 @@ The app is being built in stages, each delivered as an installable APK.
 - An ongoing notification without sound shows today's steps, the percentage of the goal and a
   progress bar, on the lock screen and on the always-on display. A check mark appears once the
   goal is reached. The status bar shows the step count as a small chip.
-- A resizable home screen widget shows today's steps; from two cells wide it adds the goal
-  percentage and a progress bar. It follows the system colours and light or dark mode.
+- Home screen widgets in four sizes show today's steps; from two cells wide they add the goal
+  percentage and a progress bar. They follow the system colours and light or dark mode.
 - Counting restarts after a reboot and after an app update, and a watchdog checks every half
   hour that it is still running.
 - The app screen shows today's count and goal progress, plus diagnostics with a
@@ -67,9 +67,19 @@ display.
 ## Widget
 
 Long-press the home screen, open the widget picker and look for **Step** (third-party widgets
-are usually listed under "Android widgets"). It starts two cells wide and can be resized down to
-one cell, where it shows only the number, or made larger. Tapping it opens the app. The counting
-service updates it whenever the count changes, at most every five seconds, and at midnight.
+are usually listed under "Android widgets"). The HyperOS launcher of the 17T does not let the
+widget be resized, so it comes in four fixed sizes, each its own entry in the picker:
+
+| Widget | Shows |
+|---|---|
+| Step count 1 × 1 | only the number |
+| Step count 2 × 1 | number, progress bar, goal percentage |
+| Step count 2 × 2 | the same with a larger number |
+| Step count 4 × 1 | the same with the progress bar across the full width |
+
+Tapping a widget opens the app. The counting service updates the widgets whenever the count
+changes, at most every five seconds, and at midnight. On launchers that do resize widgets, any
+of them can be resized and adapts its layout.
 
 ## Counting rules
 

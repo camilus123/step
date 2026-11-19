@@ -1,7 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Starts as 2 x 1 cells, can shrink to 1 x 1 and grow in both directions. The periodic update
-     (30 minutes, the shortest Android allows) is only a fallback; the counting service updates
-     the widget whenever the count changes. -->
+<!-- 2 x 1 cells. The HyperOS launcher of the 17T does not let this widget be resized, so the other sizes are offered as separate widgets (step_widget_*.xml). Launchers that do resize can still resize any of them. The periodic update (30 minutes, the shortest Android allows) is only a fallback; the counting service updates the widgets whenever the count changes. -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:description="@string/widget_description"
     android:initialLayout="@layout/glance_default_loading_layout"

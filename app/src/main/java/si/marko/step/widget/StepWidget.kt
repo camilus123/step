@@ -53,10 +53,14 @@ import java.text.NumberFormat
  * - Wider: the number, the goal percentage and a progress bar.
  * - Taller as well: the same with a larger number.
  *
+ * The layout adapts to the size it is given. The HyperOS launcher of the 17T does not let the
+ * widget be resized, so the same widget is also offered in fixed sizes (see the subclasses at
+ * the end of this file); each appears as its own entry in the widget picker.
+ *
  * Colours come from the system theme (wallpaper colours on Android 12 and later) and follow
  * light and dark mode. Tapping it opens the app.
  */
-class StepWidget : GlanceAppWidget() {
+open class StepWidget : GlanceAppWidget() {
 
     override val sizeMode = SizeMode.Responsive(setOf(SMALL, WIDE, LARGE))
 
@@ -160,20 +164,56 @@ class StepWidget : GlanceAppWidget() {
         /** Called by the counting service with the number it has just put in the notification. */
         suspend fun show(context: Context, steps: Long) {
             today.value = steps
-            runCatching { StepWidget().updateAll(context) }
+            updateEverySize(context)
         }
 
         /** For when the service is not there to push numbers: read the stored count and show it. */
         suspend fun refreshFromDatabase(context: Context) {
             loadFromDatabase(context)
-            StepWidget().updateAll(context)
+            updateEverySize(context)
         }
 
-        suspend fun count(context: Context): Int =
-            runCatching { GlanceAppWidgetManager(context).getGlanceIds(StepWidget::class.java).size }.getOrDefault(-1)
+        private fun everySize(): List<StepWidget> = listOf(StepWidget(), StepWidget1x1(), StepWidget2x2(), StepWidget4x1())
+
+        private suspend fun updateEverySize(context: Context) {
+            for (widget in everySize()) runCatching { widget.updateAll(context) }
+        }
+
+        /** How many widgets of each size are on the home screen, e.g. "2x1: 1, 1x1: 0, ...". */
+        suspend fun countText(context: Context): String {
+            val manager = GlanceAppWidgetManager(context)
+            val parts = mutableListOf<String>()
+            for ((name, widget) in listOf("2x1", "1x1", "2x2", "4x1").zip(everySize())) {
+                val count = try {
+                    manager.getGlanceIds(widget.javaClass).size.toString()
+                } catch (e: Exception) {
+                    "?"
+                }
+                parts += "$name: $count"
+            }
+            return parts.joinToString()
+        }
     }
 }
 
+// One class per size: Glance keeps track of placed widgets by widget class.
+class StepWidget1x1 : StepWidget()
+class StepWidget2x2 : StepWidget()
+class StepWidget4x1 : StepWidget()
+
+/** 2 x 1 cells, the original. */
 class StepWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = StepWidget()
+}
+
+class StepWidget1x1Receiver : GlanceAppWidgetReceiver() {
+    override val glanceAppWidget: GlanceAppWidget = StepWidget1x1()
+}
+
+class StepWidget2x2Receiver : GlanceAppWidgetReceiver() {
+    override val glanceAppWidget: GlanceAppWidget = StepWidget2x2()
+}
+
+class StepWidget4x1Receiver : GlanceAppWidgetReceiver() {
+    override val glanceAppWidget: GlanceAppWidget = StepWidget4x1()
 }

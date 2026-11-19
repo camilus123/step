@@ -180,7 +180,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     "Sensor listener registered" to yesNo(ServiceStatus.listenerRegistered),
                     "Readings this run" to ServiceStatus.readingsThisRun.toString(),
                     "Notification updates this run" to ServiceStatus.notificationUpdates.toString(),
-                    "Home screen widgets placed" to StepWidget.count(app).toString(),
+                    "Home screen widgets placed" to StepWidget.countText(app),
                 ),
             ),
             DiagSection(
