@@ -36,11 +36,12 @@ data class Outcome(
  * - The sensor reports "steps since boot". Only the difference to the previous reading counts.
  * - The very first reading only sets the baseline. Steps walked before the app first saw the
  *   sensor are unknown and are not invented.
- * - The steps between two readings are spread evenly over the time between the moment the sensor
- *   took the previous reading and the moment it took the new one, and cut at hour boundaries.
- *   While the app is listening that time span is seconds, so steps land in the hour they were
- *   walked. After a gap (the service was not running) nothing is dropped; the gap's steps are
- *   spread over the gap.
+ * - The steps between two readings were walked somewhere between the moment the sensor took the
+ *   previous reading and the moment it took the new one. They are spread evenly over the end of
+ *   that span, over at most [MAX_MILLIS_PER_STEP] per step, and cut at hour boundaries. So ten
+ *   steps after a night on the desk land in the minute they were walked, not across the night,
+ *   while thousands of steps from a long gap (the service was not running) are spread over the
+ *   hours of that gap. Nothing is ever dropped.
  * - The spread never reaches back further than the start of the day before the new reading.
  * - After a reboot the counter restarts at zero, so everything it shows was walked since boot
  *   and is credited from the boot time onward. Steps walked between the last reading before the
@@ -50,8 +51,17 @@ data class Outcome(
  */
 object StepAccountant {
 
-    /** Spans longer than this are mentioned in the event log as a credited gap. */
+    /** Steps spread over more time than this are mentioned in the event log as a credited gap. */
     const val GAP_NOTE_THRESHOLD_MS = 10 * 60_000L
+
+    /**
+     * The slowest pace the spread assumes: one step every three seconds, a very slow stroll.
+     * The sensor stamps a reading with the time of the last counted step, so the steps of a
+     * reading ended at that time; this bounds how far back before it they can plausibly reach.
+     * The 17T reports the first ten or so steps of a walk in one go, which is what made a
+     * purely even spread put single steps into hours where nobody walked.
+     */
+    const val MAX_MILLIS_PER_STEP = 3_000L
 
     private val NOTE_TIME: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
 
@@ -101,8 +111,9 @@ object StepAccountant {
         }
 
         val credits = distribute(steps, startMillis, eventWallMillis, zone)
-        if (note == null && steps > 0 && eventWallMillis - startMillis > GAP_NOTE_THRESHOLD_MS) {
-            note = "Gap credited: $steps steps between ${format(startMillis, zone)} and " +
+        val spreadFrom = spreadStart(steps, startMillis, eventWallMillis, zone)
+        if (note == null && steps > 0 && eventWallMillis - spreadFrom > GAP_NOTE_THRESHOLD_MS) {
+            note = "Gap credited: $steps steps between ${format(spreadFrom, zone)} and " +
                 "${format(eventWallMillis, zone)}, into ${credits.size} hourly bucket(s)"
         }
         return Outcome(
@@ -114,14 +125,25 @@ object StepAccountant {
     }
 
     /**
-     * Spreads [steps] evenly over the time from [startMillis] to [endMillis] and returns how many
+     * Where the spread of [steps] begins: the start of the span, but no earlier than
+     * [MAX_MILLIS_PER_STEP] per step before its end and no earlier than the start of the day
+     * before its end.
+     */
+    fun spreadStart(steps: Long, startMillis: Long, endMillis: Long, zone: ZoneId): Long {
+        val end = Instant.ofEpochMilli(endMillis).atZone(zone)
+        val earliestDay = end.toLocalDate().minusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
+        val earliestPace = endMillis - steps * MAX_MILLIS_PER_STEP
+        return maxOf(startMillis, earliestDay, earliestPace)
+    }
+
+    /**
+     * Spreads [steps] evenly over the time from [spreadStart] to [endMillis] and returns how many
      * fall into each hourly bucket. The total always equals [steps] exactly.
      */
     fun distribute(steps: Long, startMillis: Long, endMillis: Long, zone: ZoneId): Map<BucketKey, Long> {
         if (steps <= 0) return emptyMap()
         val end = Instant.ofEpochMilli(endMillis).atZone(zone)
-        val earliest = end.toLocalDate().minusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
-        val start = maxOf(startMillis, earliest)
+        val start = spreadStart(steps, startMillis, endMillis, zone)
         // No usable time span (same instant, or the clock was set back): use the reading's hour.
         if (start >= endMillis) return mapOf(keyOf(end) to steps)
 

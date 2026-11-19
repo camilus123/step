@@ -61,9 +61,16 @@ class StepAccountantTest {
 
     @Test
     fun `steps across midnight are split between the two days`() {
-        // Previous reading 23:50, new one 00:03 with 130 steps: 10 min before, 3 min after.
-        val out = StepAccountant.process(state(9000, "2026-11-17T23:50:00"), 9130, at("2026-11-18T00:03:00"), boot, zone)
-        assertEquals(mapOf(key("2026-11-17", 23) to 100L, key("2026-11-18", 0) to 30L), out.credits)
+        // Previous reading 23:50, new one 00:03 with 260 steps: 10 min before, 3 min after.
+        val out = StepAccountant.process(state(9000, "2026-11-17T23:50:00"), 9260, at("2026-11-18T00:03:00"), boot, zone)
+        assertEquals(mapOf(key("2026-11-17", 23) to 200L, key("2026-11-18", 0) to 60L), out.credits)
+    }
+
+    @Test
+    fun `a few steps just after midnight stay on the new day`() {
+        // 20 steps reported at 00:00:30 after a quiet evening: at most 60 s back, so 23:59:30.
+        val out = StepAccountant.process(state(9000, "2026-11-17T21:00:00"), 9020, at("2026-11-18T00:00:30"), boot, zone)
+        assertEquals(mapOf(key("2026-11-17", 23) to 10L, key("2026-11-18", 0) to 10L), out.credits)
     }
 
     @Test
@@ -76,33 +83,49 @@ class StepAccountantTest {
 
     @Test
     fun `a gap is spread evenly over its hours and nothing is dropped`() {
-        // Service dead from 10:30 to 13:30, 3000 steps: 30 min, 60, 60, 30 min.
-        val out = StepAccountant.process(state(2000, "2026-11-17T10:30:00"), 5000, at("2026-11-17T13:30:00"), boot, zone)
+        // Service dead from 10:30 to 13:30, 6000 steps: 30 min, 60, 60, 30 min.
+        val out = StepAccountant.process(state(2000, "2026-11-17T10:30:00"), 8000, at("2026-11-17T13:30:00"), boot, zone)
         assertEquals(
             mapOf(
-                key("2026-11-17", 10) to 500L,
-                key("2026-11-17", 11) to 1000L,
-                key("2026-11-17", 12) to 1000L,
-                key("2026-11-17", 13) to 500L,
+                key("2026-11-17", 10) to 1000L,
+                key("2026-11-17", 11) to 2000L,
+                key("2026-11-17", 12) to 2000L,
+                key("2026-11-17", 13) to 1000L,
             ),
             out.credits,
         )
         assertNotNull(out.note)
-        assertTrue(out.note!!.startsWith("Gap credited: 3000 steps"))
+        assertTrue(out.note!!.startsWith("Gap credited: 6000 steps"))
+    }
+
+    @Test
+    fun `a gap with few steps is not smeared over hours nobody walked in`() {
+        // Seen on the 17T: phone on the desk from 22:58, ten steps reported at 09:54 next morning.
+        val out = StepAccountant.process(state(4000, "2026-11-18T22:58:00"), 4010, at("2026-11-19T09:54:29"), boot, zone)
+        assertEquals(mapOf(key("2026-11-19", 9) to 10L), out.credits)
+        assertNull(out.note)
+    }
+
+    @Test
+    fun `a gap with a moderate walk reaches back three seconds per step`() {
+        // 1200 steps after a six hour gap: spread over the last hour only (1200 x 3 s).
+        val out = StepAccountant.process(state(0, "2026-11-17T08:00:00"), 1200, at("2026-11-17T14:30:00"), boot, zone)
+        assertEquals(mapOf(key("2026-11-17", 13) to 600L, key("2026-11-17", 14) to 600L), out.credits)
+        assertNotNull(out.note)
     }
 
     @Test
     fun `rounding never loses or invents a step`() {
-        // 7 steps over three equal hours cannot be split evenly.
-        val credits = StepAccountant.distribute(7, at("2026-11-17T10:00:00"), at("2026-11-17T13:00:00"), zone)
-        assertEquals(7L, credits.values.sum())
+        // 7000 steps over three equal hours cannot be split evenly.
+        val credits = StepAccountant.distribute(7000, at("2026-11-17T10:00:00"), at("2026-11-17T13:00:00"), zone)
+        assertEquals(7000L, credits.values.sum())
         assertEquals(setOf(key("2026-11-17", 10), key("2026-11-17", 11), key("2026-11-17", 12)), credits.keys)
-        assertTrue(credits.values.all { it in 2L..3L })
+        assertTrue(credits.values.all { it in 2333L..2334L })
     }
 
     @Test
     fun `totals are exact for awkward spans`() {
-        for (steps in listOf(1L, 2L, 13L, 999L, 12_345L)) {
+        for (steps in listOf(1L, 2L, 13L, 999L, 12_345L, 54_321L)) {
             val credits = StepAccountant.distribute(steps, at("2026-11-16T22:17:31"), at("2026-11-17T09:41:07"), zone)
             assertEquals(steps, credits.values.sum())
             assertTrue(credits.values.all { it > 0 })
@@ -111,17 +134,17 @@ class StepAccountantTest {
 
     @Test
     fun `a very long gap is capped at the previous day`() {
-        // Last reading five days ago: spread only over yesterday and today.
-        val out = StepAccountant.process(state(100, "2026-11-12T08:00:00"), 3700, at("2026-11-17T12:00:00"), boot, zone)
+        // Last reading five days ago, 72 000 steps since: spread only over yesterday and today.
+        val out = StepAccountant.process(state(100, "2026-11-12T08:00:00"), 72_100, at("2026-11-17T12:00:00"), boot, zone)
         val days = out.credits.keys.map { it.epochDay }.toSet()
         assertEquals(
             setOf(LocalDate.parse("2026-11-16").toEpochDay(), LocalDate.parse("2026-11-17").toEpochDay()),
             days,
         )
-        assertEquals(3600L, out.credits.values.sum())
-        // 36 hours, 100 steps each.
+        assertEquals(72_000L, out.credits.values.sum())
+        // 36 hours, 2000 steps each.
         assertEquals(36, out.credits.size)
-        assertTrue(out.credits.values.all { it == 100L })
+        assertTrue(out.credits.values.all { it == 2000L })
     }
 
     // ---- reboot ----------------------------------------------------------------------------
@@ -160,8 +183,9 @@ class StepAccountantTest {
     @Test
     fun `steps after a reboot are not smeared back before the boot`() {
         val newBoot = BootInfo(15, at("2026-11-17T12:00:00"))
-        val out = StepAccountant.process(state(5000, "2026-11-17T08:00:00"), 600, at("2026-11-17T13:00:00"), newBoot, zone)
-        assertEquals(mapOf(key("2026-11-17", 12) to 600L), out.credits)
+        // 3000 steps would reach back 150 minutes, to 10:30; the boot at 12:00 limits it.
+        val out = StepAccountant.process(state(5000, "2026-11-17T08:00:00"), 3000, at("2026-11-17T13:00:00"), newBoot, zone)
+        assertEquals(mapOf(key("2026-11-17", 12) to 3000L), out.credits)
     }
 
     @Test
@@ -203,8 +227,8 @@ class StepAccountantTest {
         // 25 Oct 2026: 03:00 CEST becomes 02:00 CET. From 01:30 CEST to 02:30 CET is two hours.
         val start = at("2026-10-25T01:30:00")                     // CEST, first pass
         val end = start + 2 * 3_600_000L                           // 02:30 CET, second pass
-        val credits = StepAccountant.distribute(120, start, end, zone)
-        assertEquals(mapOf(key("2026-10-25", 1) to 30L, key("2026-10-25", 2) to 90L), credits)
+        val credits = StepAccountant.distribute(3600, start, end, zone)
+        assertEquals(mapOf(key("2026-10-25", 1) to 900L, key("2026-10-25", 2) to 2700L), credits)
     }
 
     @Test
@@ -212,7 +236,7 @@ class StepAccountantTest {
         // 29 Mar 2026: 02:00 CET becomes 03:00 CEST. 01:30 to 03:30 local is one real hour.
         val start = at("2026-03-29T01:30:00")
         val end = start + 3_600_000L
-        val credits = StepAccountant.distribute(60, start, end, zone)
-        assertEquals(mapOf(key("2026-03-29", 1) to 30L, key("2026-03-29", 3) to 30L), credits)
+        val credits = StepAccountant.distribute(1800, start, end, zone)
+        assertEquals(mapOf(key("2026-03-29", 1) to 900L, key("2026-03-29", 3) to 900L), credits)
     }
 }
