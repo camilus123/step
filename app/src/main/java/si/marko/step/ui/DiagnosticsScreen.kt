@@ -17,6 +17,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -129,6 +130,25 @@ fun DiagnosticsScreen(
             }
 
             item {
+                val options = vm.lockScreenOptions
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(stringResource(R.string.lock_options_title), style = MaterialTheme.typography.titleMedium)
+                        Text(stringResource(R.string.lock_options_explanation), style = MaterialTheme.typography.bodySmall)
+                        OptionRow(R.string.lock_option_importance, R.string.lock_option_importance_hint, options.normalImportance) {
+                            vm.changeLockScreenOptions(options.copy(normalImportance = it))
+                        }
+                        OptionRow(R.string.lock_option_repost, R.string.lock_option_repost_hint, options.repostOnScreenOff) {
+                            vm.changeLockScreenOptions(options.copy(repostOnScreenOff = it))
+                        }
+                        OptionRow(R.string.lock_option_live, R.string.lock_option_live_hint, options.liveUpdate) {
+                            vm.changeLockScreenOptions(options.copy(liveUpdate = it))
+                        }
+                    }
+                }
+            }
+
+            item {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = { scope.launch { onCopy(vm.buildReport().toText()) } }) {
                         Text(stringResource(R.string.copy_diagnostics))
@@ -150,6 +170,17 @@ fun DiagnosticsScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun OptionRow(title: Int, hint: Int, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.weight(1f)) {
+            Text(stringResource(title), style = MaterialTheme.typography.bodyLarge)
+            Text(stringResource(hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Switch(checked = checked, onCheckedChange = onChange)
     }
 }
 

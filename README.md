@@ -20,8 +20,9 @@ The app is being built in stages, each delivered as an installable APK.
 ### What works now
 
 - Steps are counted all day by a foreground service and stored in hourly buckets.
-- A silent ongoing notification shows today's steps, the percentage of the goal and a progress
-  bar, also on the lock screen. A check mark appears once the goal is reached.
+- An ongoing notification without sound shows today's steps, the percentage of the goal and a
+  progress bar. A check mark appears once the goal is reached. Getting it onto the HyperOS lock
+  screen is still being worked out; the app has three switches for trying different ways.
 - Counting restarts after a reboot and after an app update, and a watchdog checks every half
   hour that it is still running.
 - The app screen shows today's count and goal progress, plus diagnostics with a
@@ -63,13 +64,19 @@ names below are the usual HyperOS ones and still need confirming on HyperOS 3.
   not move old steps to a different day.
 - **First start:** the first reading only sets the baseline. Steps walked before the app first
   saw the sensor are not counted.
-- **Midnight and hour boundaries:** the steps between two readings are spread evenly over the
-  time between them and cut at hour boundaries. While the app is counting, that time is a few
-  seconds, so steps land in the hour, and on the day, they were walked.
-- **Gaps (counting was stopped for a while):** the steps taken in the gap are never dropped. They
-  are spread evenly over the gap, reaching back no further than the start of the previous day.
-  On the 17T the sensor stamps each reading with the time of the last counted step, so a gap
-  ends where the walking ended, not where the app woke up.
+- **Where the steps of a reading go:** the steps between two readings were walked somewhere
+  between the moment the sensor took the previous reading and the moment it took the new one.
+  They are spread evenly over the end of that time, over at most three seconds per step, and cut
+  at hour boundaries. While the app is counting, readings are seconds apart, so steps land in
+  the hour, and on the day, they were walked.
+- **Quiet periods:** the 17T reports the first ten or so steps of a walk in one go. Thanks to
+  the three-seconds-per-step limit those land in the minute they were walked, not across the
+  hours the phone lay on the desk.
+- **Gaps (counting was stopped for a while):** the steps taken in the gap are never dropped.
+  The same rule spreads them: a few hundred steps go to the end of the gap, thousands of steps
+  cover the hours of the gap, reaching back no further than the start of the previous day. On
+  the 17T the sensor stamps each reading with the time of the last counted step, so a gap ends
+  where the walking ended, not where the app woke up.
 - **Reboot:** the counter restarts from zero. The app detects the reboot through Android's boot
   counter and starts a new baseline; steps counted since boot are credited from the boot time
   onward. Steps walked after the last reading before a shutdown are lost if counting was stopped

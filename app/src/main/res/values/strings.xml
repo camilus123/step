@@ -10,8 +10,20 @@
     <string name="goal_reached_mark">✓</string>
 
     <!-- Notification channel -->
-    <string name="channel_steps_name">Step count</string>
-    <string name="channel_steps_description">Silent, always-on notification with today\'s steps. It also keeps counting alive in the background.</string>
+    <string name="channel_steps_name">Step count (silent)</string>
+    <string name="channel_steps_description">Always-on notification with today\'s steps, as a silent notification. It also keeps counting alive in the background.</string>
+    <string name="channel_steps_lock_name">Step count (lock screen)</string>
+    <string name="channel_steps_lock_description">Always-on notification with today\'s steps, as a normal notification without sound or vibration so that it can show on the lock screen. It also keeps counting alive in the background.</string>
+
+    <!-- Lock screen options (temporary, until it is known what HyperOS needs) -->
+    <string name="lock_options_title">Lock screen notification</string>
+    <string name="lock_options_explanation">HyperOS decides by its own rules what it shows on the lock screen. Try these until the step count appears there, then report which combination worked.</string>
+    <string name="lock_option_importance">Normal importance</string>
+    <string name="lock_option_importance_hint">Not a \"silent\" notification. Still no sound or vibration.</string>
+    <string name="lock_option_repost">Post afresh when the screen turns off</string>
+    <string name="lock_option_repost_hint">For lock screens that only list notifications that arrived since the last unlock.</string>
+    <string name="lock_option_live">Live update</string>
+    <string name="lock_option_live_hint">Android 16 live update: may add a step count chip to the status bar.</string>
 
     <!-- Status and setup -->
     <string name="status_counting">Counting in the background</string>
