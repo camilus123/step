@@ -31,10 +31,7 @@ private enum class Tab(val label: Int, val icon: Int) {
 @Composable
 fun MainScreen(
     vm: MainViewModel,
-    onRequestPermissions: () -> Unit,
-    onOpenAppSettings: () -> Unit,
-    onAllowBackground: () -> Unit,
-    onCopy: (String) -> Unit,
+    actions: SettingsActions,
 ) {
     var tabIndex by rememberSaveable { mutableIntStateOf(0) }
     val tab = Tab.entries[tabIndex]
@@ -56,9 +53,9 @@ fun MainScreen(
     ) { padding ->
         Box(Modifier.padding(padding)) {
             when (tab) {
-                Tab.TODAY -> TodayScreen(vm, onRequestPermissions, onOpenAppSettings, onAllowBackground)
+                Tab.TODAY -> TodayScreen(vm, actions.requestPermissions, actions.openAppSettings, actions.allowBackground)
                 Tab.STATS -> StatsScreen(vm)
-                Tab.SETTINGS -> SettingsScreen(vm, onCopy)
+                Tab.SETTINGS -> SettingsScreen(vm, actions)
             }
         }
     }

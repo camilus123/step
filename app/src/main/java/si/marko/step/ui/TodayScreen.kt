@@ -44,6 +44,7 @@ fun TodayScreen(
     val steps by vm.todaySteps.collectAsState(initial = 0L)
     val hours by vm.todayHours.collectAsState(initial = List(24) { 0L })
     val running by vm.serviceRunning.collectAsState()
+    val goal by vm.goalToday.collectAsState(initial = Goal.DEFAULT)
     val tick = vm.refreshTick
     val numbers = remember { NumberFormat.getIntegerInstance() }
     var selectedHour by remember { mutableStateOf<Int?>(null) }
@@ -65,7 +66,7 @@ fun TodayScreen(
                             style = MaterialTheme.typography.displayLarge,
                             fontWeight = FontWeight.SemiBold,
                         )
-                        if (Goal.reached(steps, vm.goal)) {
+                        if (Goal.reached(steps, goal)) {
                             Text(
                                 stringResource(R.string.goal_reached_mark),
                                 style = MaterialTheme.typography.displayMedium,
@@ -75,10 +76,10 @@ fun TodayScreen(
                         }
                     }
                     LinearProgressIndicator(
-                        progress = { (steps.toFloat() / vm.goal).coerceIn(0f, 1f) },
+                        progress = { (steps.toFloat() / goal).coerceIn(0f, 1f) },
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    Text(stringResource(R.string.goal_progress, Goal.percent(steps, vm.goal), numbers.format(vm.goal)))
+                    Text(stringResource(R.string.goal_progress, Goal.percent(steps, goal), numbers.format(goal)))
                     Text(
                         stringResource(if (running) R.string.status_counting else R.string.status_not_counting),
                         style = MaterialTheme.typography.bodySmall,

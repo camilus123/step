@@ -3,6 +3,7 @@ package si.marko.step
 import android.annotation.SuppressLint
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.content.ComponentName
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -15,6 +16,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import si.marko.step.ui.MainScreen
+import si.marko.step.ui.SettingsActions
 import si.marko.step.ui.StepTheme
 
 class MainActivity : ComponentActivity() {
@@ -24,18 +26,33 @@ class MainActivity : ComponentActivity() {
     private val permissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { vm.onPermissionResult(it) }
 
+    // The system file picker. The result is null when the user backs out.
+    private val exportJsonLauncher =
+        registerForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { it?.let(vm::exportJson) }
+    private val exportCsvLauncher =
+        registerForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { it?.let(vm::exportCsv) }
+    private val importLauncher =
+        registerForActivityResult(ActivityResultContracts.OpenDocument()) { it?.let(vm::importJson) }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        val actions = SettingsActions(
+            requestPermissions = { permissionLauncher.launch(vm.missingPermissions()) },
+            openAppSettings = { open("app settings", appDetails()) },
+            allowBackground = ::requestBatteryExemption,
+            openAutostart = ::openAutostart,
+            openBatterySaver = ::openBatterySaver,
+            openNotificationSettings = ::openNotificationSettings,
+            exportJson = { exportJsonLauncher.launch(vm.suggestedBackupName("json")) },
+            exportCsv = { exportCsvLauncher.launch(vm.suggestedBackupName("csv")) },
+            // Some file managers do not label .json files as JSON, so everything is offered.
+            importJson = { importLauncher.launch(arrayOf("application/json", "*/*")) },
+            copy = ::copyToClipboard,
+        )
         setContent {
             StepTheme {
-                MainScreen(
-                    vm = vm,
-                    onRequestPermissions = { permissionLauncher.launch(vm.missingPermissions()) },
-                    onOpenAppSettings = ::openAppSettings,
-                    onAllowBackground = ::requestBatteryExemption,
-                    onCopy = ::copyToClipboard,
-                )
+                MainScreen(vm = vm, actions = actions)
             }
         }
     }
@@ -47,20 +64,62 @@ class MainActivity : ComponentActivity() {
         vm.onForeground()
     }
 
-    /** Shows the system dialog that exempts the app from battery optimisation. */
-    @SuppressLint("BatteryLife") // Sideloaded personal app; counting all day is its whole purpose.
-    private fun requestBatteryExemption() {
-        val direct = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.fromParts("package", packageName, null))
-        runCatching { startActivity(direct) }
-            .recoverCatching { startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) }
-            .onFailure { openAppSettings() }
+    // ---- system settings pages -----------------------------------------------------------
+
+    private fun appDetails() = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", packageName, null))
+
+    /**
+     * Opens the first of [candidates] that the phone accepts. The Xiaomi pages are not part of
+     * Android and may be missing or closed to other apps on some versions, so each attempt can
+     * fail; the last candidate is always a standard Android page. Which one opened goes to the
+     * event log, because that is the only way to learn it from a phone nobody can look at.
+     */
+    private fun open(what: String, vararg candidates: Intent) {
+        candidates.forEachIndexed { index, intent ->
+            try {
+                startActivity(intent)
+                vm.note("Opened $what (option ${index + 1} of ${candidates.size})")
+                return
+            } catch (e: Exception) {
+                // Try the next one.
+            }
+        }
+        vm.note("Could not open $what")
     }
 
-    private fun openAppSettings() {
-        startActivity(
-            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", packageName, null))
-        )
-    }
+    /** Shows the system dialog that exempts the app from battery optimisation. */
+    @SuppressLint("BatteryLife") // Sideloaded personal app; counting all day is its whole purpose.
+    private fun requestBatteryExemption() = open(
+        "battery optimisation dialog",
+        Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.fromParts("package", packageName, null)),
+        Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS),
+        appDetails(),
+    )
+
+    /** Xiaomi's list of apps allowed to start by themselves. */
+    private fun openAutostart() = open(
+        "autostart settings",
+        Intent().setComponent(
+            ComponentName("com.miui.securitycenter", "com.miui.permcenter.autostart.AutoStartManagementActivity")
+        ),
+        Intent("miui.intent.action.OP_AUTO_START").addCategory(Intent.CATEGORY_DEFAULT),
+        appDetails(),
+    )
+
+    /** Xiaomi's per-app battery saver page ("No restrictions"). */
+    private fun openBatterySaver() = open(
+        "battery saver settings",
+        Intent().setComponent(ComponentName("com.miui.powerkeeper", "com.miui.powerkeeper.ui.HiddenAppsConfigActivity"))
+            .putExtra("package_name", packageName)
+            .putExtra("package_label", getString(R.string.app_name)),
+        appDetails(),
+    )
+
+    private fun openNotificationSettings() = open(
+        "notification settings",
+        Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, packageName),
+        appDetails(),
+    )
 
     private fun copyToClipboard(text: String) {
         val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager

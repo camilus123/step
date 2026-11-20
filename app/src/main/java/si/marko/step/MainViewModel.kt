@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.hardware.Sensor
 import android.hardware.SensorManager
 import android.os.Build
@@ -21,10 +22,11 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import si.marko.step.core.Goal
+import si.marko.step.core.BackupFormatException
 import si.marko.step.core.Period
 import si.marko.step.core.PeriodKind
 import si.marko.step.core.PeriodStats
@@ -36,6 +38,7 @@ import si.marko.step.service.ServiceStatus
 import si.marko.step.service.StepNotification
 import si.marko.step.service.StepService
 import si.marko.step.widget.StepWidget
+import java.text.NumberFormat
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -65,13 +68,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     /** The figures for the week, month or year being looked at; follows the database live. */
     @OptIn(ExperimentalCoroutinesApi::class)
     val stats: Flow<PeriodStats> = statsPeriod.flatMapLatest { period ->
-        graph.repository.dayTotals(period.start, period.end).map { totals ->
+        combine(graph.repository.dayTotals(period.start, period.end), graph.repository.goalHistoryFlow()) { totals, goals ->
             StatsCalculator.compute(
                 period = period,
                 dayTotals = totals,
                 today = LocalDate.now(),
                 firstRecordedDay = graph.repository.firstDayWithSteps(),
-                goals = graph.repository.goalHistory(),
+                goals = goals,
             )
         }
     }
@@ -87,7 +90,84 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     val serviceRunning = ServiceStatus.running
-    val goal: Int = Goal.DEFAULT
+    /** The goal that applies today; follows changes made in settings. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val goalToday: Flow<Int> = day.flatMapLatest { graph.repository.goalOn(it) }
+
+    /** Sets the daily goal from today on. Earlier days keep the goal they had. */
+    fun setGoal(goal: Int) {
+        viewModelScope.launch {
+            graph.repository.setGoal(goal)
+            refresh()
+        }
+    }
+
+    // ---- export and import -------------------------------------------------------------
+
+    private val backupFiles = BackupFiles(app, graph.repository)
+
+    /** What the last export or import did, as text for the settings screen. Null before any. */
+    var backupMessage by mutableStateOf<String?>(null)
+        private set
+
+    var backupFailed by mutableStateOf(false)
+        private set
+
+    private fun backupTask(failurePrefix: Int, task: suspend () -> String) {
+        viewModelScope.launch {
+            try {
+                backupMessage = task()
+                backupFailed = false
+            } catch (e: Exception) {
+                val reason = if (e is BackupFormatException) e.message else "${e.javaClass.simpleName}: ${e.message}"
+                backupMessage = getApplication<Application>().getString(failurePrefix, reason)
+                backupFailed = true
+                graph.log.add("Backup task failed: $reason")
+            }
+            refresh()
+        }
+    }
+
+    fun exportJson(target: Uri) = backupTask(R.string.export_failed) {
+        val hours = backupFiles.exportJson(target)
+        graph.log.add("Exported $hours hours as JSON")
+        getApplication<Application>().getString(R.string.export_done, hours)
+    }
+
+    fun exportCsv(target: Uri) = backupTask(R.string.export_failed) {
+        val hours = backupFiles.exportCsv(target)
+        graph.log.add("Exported $hours hours as CSV")
+        getApplication<Application>().getString(R.string.export_done, hours)
+    }
+
+    fun importJson(source: Uri) = backupTask(R.string.import_failed) {
+        val s = backupFiles.importJson(source)
+        val app = getApplication<Application>()
+        val numbers = NumberFormat.getIntegerInstance()
+        if (s.hoursInFile == 0 && s.goalsAdded == 0) {
+            app.getString(R.string.import_empty)
+        } else {
+            app.getString(
+                R.string.import_done,
+                s.hoursInFile,
+                s.firstDay?.toString() ?: "–",
+                s.lastDay?.toString() ?: "–",
+                s.hoursAdded,
+                s.hoursRaised,
+                s.hoursUnchanged,
+                numbers.format(s.stepsGained),
+                s.goalsAdded,
+            )
+        }
+    }
+
+    /** Writes a line to the event log, e.g. which settings screen could be opened. */
+    fun note(message: String) {
+        graph.log.add(message)
+        refresh()
+    }
+
+    fun suggestedBackupName(extension: String): String = "step-backup-${LocalDate.now()}.$extension"
 
     var report by mutableStateOf(DiagnosticsReport(emptyList(), emptyList()))
         private set
@@ -239,7 +319,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     "Baseline raw value" to (state?.lastRaw?.toString() ?: "none yet"),
                     "Baseline taken at" to (state?.let { formatTime(it.lastEventWallMillis) } ?: "-"),
                     "Baseline boot count" to (state?.bootCount?.toString() ?: "-"),
-                    "Goal" to goal.toString(),
+                    "Goal today" to graph.repository.goalHistory().goalOn(LocalDate.ofEpochDay(today)).toString(),
+                    "Goal changes stored" to graph.repository.goalChangeCount().toString(),
                 ),
             ),
             DiagSection(

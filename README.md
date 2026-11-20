@@ -5,34 +5,26 @@ No account, no cloud, no ads, no analytics, and no internet permission.
 
 Licensed under the GNU GPL v3 (see `LICENSE`). The original build brief is in `INSTRUCTIONS.md`.
 
-## Status
+## What it does
 
-The app is being built in stages, each delivered as an installable APK.
+- **Counts steps all day** with a foreground service reading the phone's hardware step counter,
+  and stores them in hourly buckets. Counting restarts after a reboot and after an app update,
+  and a watchdog checks every half hour that it is still running.
+- **Lock screen:** an ongoing notification without sound shows today's steps, the percentage of
+  the goal and a progress bar, on the lock screen and on the always-on display. A check mark
+  appears once the goal is reached. The status bar shows the step count as a small chip.
+- **Home screen widgets** in four sizes, following the system colours and light or dark mode.
+- **Three tabs.** *Today*: the count, goal progress and a bar chart of the day by hour.
+  *Statistics*: week, month or year with a bar chart, total, daily average, best day and the
+  number of days the goal was reached. *Settings*: daily goal, export and import, a guide to the
+  phone settings that keep counting alive, and diagnostics.
+- **Daily goal**, 10 000 steps unless changed. A change applies from that day on; earlier days
+  stay judged against the goal they had.
+- **Export and import** of the whole history as one file.
 
-| Stage | Contents | State |
-|---|---|---|
-| 1 | Project skeleton, signed CI build, raw sensor readout, diagnostics | done, confirmed on the 17T |
-| 2 | Background service, storage, correct counting, lock screen notification | done, confirmed on the 17T |
-| 3 | Home screen widget | done, confirmed on the 17T |
-| 4 | Statistics per week, month and year | **this build** |
-| 5 | Daily goal setting, export and import, HyperOS setup guide, polish | planned |
-
-### What works now
-
-- Steps are counted all day by a foreground service and stored in hourly buckets.
-- An ongoing notification without sound shows today's steps, the percentage of the goal and a
-  progress bar, on the lock screen and on the always-on display. A check mark appears once the
-  goal is reached. The status bar shows the step count as a small chip.
-- Home screen widgets in four sizes show today's steps; from two cells wide they add the goal
-  percentage and a progress bar. They follow the system colours and light or dark mode.
-- Counting restarts after a reboot and after an app update, and a watchdog checks every half
-  hour that it is still running.
-- The app has three tabs. **Today**: the count, goal progress and a bar chart of the day by
-  hour. **Statistics**: week, month or year with a bar chart, total, daily average, best day and
-  the number of days the goal was reached; the arrows move to earlier periods. **Settings**: for
-  now the diagnostics with a **Copy diagnostics** button.
-
-The goal is fixed at 10 000 steps until settings arrive in stage 5.
+Built in five stages, each confirmed on the phone before the next: sensor check and signed
+builds; background counting and notification; widget; statistics; goal, backup and setup guide.
+All of it has run on the Xiaomi 17T except the last stage, which is the current build.
 
 ## Download and install
 
@@ -47,19 +39,21 @@ the stage, then a build number that only ever goes up.
 
 ## HyperOS settings to change by hand
 
-HyperOS stops background apps aggressively. These settings tell it to leave Step alone. The menu
-names below are the usual HyperOS ones and still need confirming on HyperOS 3.
+HyperOS stops background apps aggressively. **Settings → Keep counting reliably** in the app
+lists what to set, shows what is already done, and has a button for each page it can open:
 
-1. **Background activity:** in the app, tap **Allow background activity** and confirm. This also
-   lets the app restart counting by itself.
-2. **Autostart:** Settings → Apps → Manage apps → Step → Autostart: on. Without it the app is not
-   started after a reboot.
-3. **Battery saver:** Settings → Apps → Manage apps → Step → Battery saver → No restrictions.
-4. **Lock in recent apps:** open recent apps, long-press the Step card, tap the padlock.
-5. **Lock screen notification:** in the app's notification settings, keep "Lock screen
-   notifications" on, and under Notification categories → Step count set "On the Lock screen" to
-   "Show all notifications and their contents". Keep "Notification spotlight" on: it is what puts
-   the count on the always-on display.
+1. **Permissions:** physical activity (to read the step sensor) and notifications.
+2. **Background activity:** exempts the app from battery optimisation. This also lets the app
+   restart counting by itself.
+3. **Autostart:** on, so the app starts after a reboot.
+4. **Battery saver:** "No restrictions" for Step.
+5. **Lock screen:** in the app's notification settings, keep "Lock screen notifications" and
+   "Notification spotlight" on, and under Notification categories → Step count set "On the Lock
+   screen" to "Show all notifications and their contents".
+6. **Lock in recent apps:** open recent apps, long-press the Step card, tap the padlock.
+
+The autostart and battery saver pages belong to Xiaomi, not to Android. If the phone does not
+let the app open them directly, the button opens the app's system settings page instead.
 
 What the 17T taught us about the lock screen: HyperOS 3 hides low-importance ("silent")
 notifications there regardless of these settings, so the step notification has normal importance
@@ -129,8 +123,38 @@ unit tests.
 
 ## Export and import
 
-Planned for stage 5: the full history as one JSON file (plus CSV) through the system file
-picker, and import of the same JSON format.
+In **Settings → Export and import**. Files are chosen through the system file picker, so the app
+needs no storage permission.
+
+- **Export backup** writes the whole hourly history and the goal history to one JSON file, named
+  `step-backup-<date>.json`. Keep it somewhere off the phone.
+- **Import backup** reads such a file back. For every hour the larger of the two numbers wins, so
+  an import can never lose steps, importing the same file twice changes nothing, and a backup
+  made earlier today does not overwrite the steps walked since. A goal entry from the file is
+  added only for days the app has no entry for. Afterwards the app says how many hours were
+  added, raised and left alone. A file that is damaged, or made by a newer version of the app,
+  is refused as a whole and nothing changes.
+- **Export table (CSV)** writes `date,hour,steps` lines for a spreadsheet. It is for looking at,
+  not for importing.
+
+Moving to a new phone: export on the old one, install the app on the new one, import. The new
+phone then starts counting from its own sensor; the old phone's position in its sensor count is
+not part of a backup.
+
+The file format (version 1):
+
+```json
+{
+  "format": "step-backup",
+  "formatVersion": 1,
+  "exportedAt": "2026-11-20T21:50:00+01:00",
+  "appVersion": "0.5.11",
+  "hours": [ { "date": "2026-11-18", "hour": 12, "steps": 340 } ],
+  "goals": [ { "from": "2026-11-20", "goal": 8000 } ]
+}
+```
+
+Dates are local calendar dates and hours are 0 to 23 in local time, as stored.
 
 ## Building
 

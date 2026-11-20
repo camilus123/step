@@ -60,6 +60,8 @@ data class PeriodStats(
     val goalDays: Int,
     /** Days the average is taken over; see [StatsCalculator]. */
     val countedDays: Int,
+    /** The goal to draw as a line: the one of the period's last day that has begun. */
+    val goalLine: Int,
 )
 
 /**
@@ -101,6 +103,7 @@ object StatsCalculator {
             bestDay = best?.let { BestDay(it, stepsOn(it)) },
             goalDays = days.count { Goal.reached(stepsOn(it), goals.goalOn(it)) },
             countedDays = counted.size,
+            goalLine = goals.goalOn(minOf(period.end, maxOf(today, period.start))),
         )
     }
 

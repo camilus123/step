@@ -20,6 +20,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
@@ -82,7 +83,7 @@ class StepService : Service() {
         return START_STICKY
     }
 
-    private fun buildNotification() = StepNotification.build(this, lastShownSteps, Goal.DEFAULT)
+    private fun buildNotification() = StepNotification.build(this, lastShownSteps, lastShownGoal)
 
     private fun enterForeground() {
         if (Build.VERSION.SDK_INT >= 34) {
@@ -121,16 +122,19 @@ class StepService : Service() {
             }
         }
 
-        // Notification and widget: follow today's total, at most one update per interval. "conflate"
+        // Notification and widget: follow today's total and today's goal, at most one update per interval. "conflate"
         // keeps only the newest value while waiting, so the final count is always shown.
         scope.launch {
-            day.flatMapLatest { graph.repository.dayTotal(it) }
+            val steps = day.flatMapLatest { graph.repository.dayTotal(it) }
+            val goal = day.flatMapLatest { graph.repository.goalOn(it) }
+            combine(steps, goal) { s, g -> s to g }
                 .distinctUntilChanged()
                 .conflate()
-                .collect { steps ->
+                .collect { (steps, goal) ->
                     lastShownSteps = steps
+                    lastShownGoal = goal
                     getSystemService(NotificationManager::class.java).notify(StepNotification.NOTIFICATION_ID, buildNotification())
-                    StepWidget.show(this@StepService, steps)
+                    StepWidget.show(this@StepService, steps, goal)
                     ServiceStatus.notificationUpdates++
                     delay(NOTIFICATION_MIN_INTERVAL_MS)
                 }
@@ -191,6 +195,9 @@ class StepService : Service() {
         /** Survives service restarts within one process, so the placeholder is usually right. */
         @Volatile
         private var lastShownSteps: Long = 0
+
+        @Volatile
+        private var lastShownGoal: Int = Goal.DEFAULT
 
         fun canRun(context: Context): Boolean =
             ContextCompat.checkSelfPermission(context, Manifest.permission.ACTIVITY_RECOGNITION) ==

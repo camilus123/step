@@ -23,6 +23,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -119,7 +120,7 @@ fun StatsScreen(vm: MainViewModel) {
                         values = current.bars.map { it.steps },
                         labels = current.bars.map { barLabel(period.kind, it.start) },
                         // The daily goal only means something next to daily bars.
-                        goal = if (period.kind == PeriodKind.YEAR) null else vm.goal.toLong(),
+                        goal = if (period.kind == PeriodKind.YEAR) null else current.goalLine.toLong(),
                         selected = selected,
                         onSelect = { selected = it },
                     )
@@ -154,7 +155,7 @@ fun StatsScreen(vm: MainViewModel) {
                     )
                     SummaryRow(
                         stringResource(R.string.stats_goal_days),
-                        stringResource(R.string.stats_goal_days_value, current.goalDays, current.countedDays),
+                        pluralStringResource(R.plurals.stats_goal_days_value, current.countedDays, current.goalDays, current.countedDays),
                     )
                 }
             }

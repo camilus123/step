@@ -28,7 +28,10 @@
     <string name="stats_average">Daily average</string>
     <string name="stats_best_day">Best day</string>
     <string name="stats_goal_days">Goal reached</string>
-    <string name="stats_goal_days_value">%1$d of %2$d days</string>
+    <plurals name="stats_goal_days_value">
+        <item quantity="one">%1$d of %2$d day</item>
+        <item quantity="other">%1$d of %2$d days</item>
+    </plurals>
 
     <!-- Notification channel -->
     <string name="channel_steps_name">Step count</string>
@@ -52,8 +55,58 @@
     <string name="battery_explanation">Phones stop background apps to save battery. Allowing background activity keeps the count running and lets the app restart counting by itself if the system stops it.</string>
     <string name="allow_background">Allow background activity</string>
 
+    <!-- Settings: goal -->
+    <string name="goal_title">Daily goal</string>
+    <string name="goal_value">%1$s steps</string>
+    <string name="goal_explanation">A new goal applies from today on. Earlier days stay judged against the goal they had.</string>
+    <string name="goal_change">Change</string>
+    <string name="goal_dialog_title">Daily goal</string>
+    <string name="goal_dialog_label">Steps per day</string>
+    <string name="goal_dialog_error">Enter a number from %1$s to %2$s</string>
+    <string name="save">Save</string>
+    <string name="cancel">Cancel</string>
+
+    <!-- Settings: export and import -->
+    <string name="backup_title">Export and import</string>
+    <string name="backup_explanation">Export saves your whole step history and goal history to one file, so it survives a new phone or a reinstall. Import reads such a file back: for every hour the larger number wins, so nothing you have is ever lost.</string>
+    <string name="export_json">Export backup</string>
+    <string name="export_csv">Export table (CSV)</string>
+    <string name="import_json">Import backup</string>
+    <string name="export_done">Exported %1$d hours of history.</string>
+    <string name="export_failed">Export failed: %1$s</string>
+    <string name="import_done">Read %1$d hours from %2$s to %3$s.\nAdded: %4$d hours. Raised: %5$d hours. Already up to date: %6$d hours.\nSteps gained: %7$s. Goal entries added: %8$d.</string>
+    <string name="import_empty">The backup file is valid but contains no history.</string>
+    <string name="import_failed">Import failed, nothing was changed: %1$s</string>
+
+    <!-- Settings: setup guide -->
+    <string name="setup_title">Keep counting reliably</string>
+    <string name="setup_explanation">Xiaomi phones stop background apps to save battery. These settings tell the phone to leave Step alone. Some can only be set by hand.</string>
+    <string name="setup_status_ok">Done</string>
+    <string name="setup_status_missing">Not set</string>
+    <string name="setup_status_manual">Check by hand</string>
+    <string name="setup_permissions_title">Permissions</string>
+    <string name="setup_permissions_text">\"Physical activity\" lets the app read the step sensor. Notifications show the count on the lock screen.</string>
+    <string name="setup_background_title">Background activity</string>
+    <string name="setup_background_text">Exempts the app from battery optimisation, so it may run all day and restart counting by itself.</string>
+    <string name="setup_autostart_title">Autostart</string>
+    <string name="setup_autostart_text">Lets the app start after the phone reboots. Turn on Autostart for Step.</string>
+    <string name="setup_autostart_button">Open autostart settings</string>
+    <string name="setup_battery_title">Battery saver</string>
+    <string name="setup_battery_text">Set the battery saver for Step to \"No restrictions\".</string>
+    <string name="setup_battery_button">Open battery saver</string>
+    <string name="setup_recents_title">Lock in recent apps</string>
+    <string name="setup_recents_text">Open the recent apps view, long-press the Step card and tap the padlock. The phone then keeps the app when you clear recent apps.</string>
+    <string name="setup_lockscreen_title">Lock screen</string>
+    <string name="setup_lockscreen_text">Keep \"Lock screen notifications\" and \"Notification spotlight\" on. Under Notification categories → Step count, set \"On the Lock screen\" to \"Show all notifications and their contents\".</string>
+    <string name="setup_lockscreen_button">Open notification settings</string>
+
+    <!-- Settings: about -->
+    <string name="about_title">About</string>
+    <string name="about_text">Step %1$s. Counts with the phone\'s own step sensor, keeps everything on the phone and never uses the internet.</string>
+    <string name="show_diagnostics">Show diagnostics</string>
+    <string name="hide_diagnostics">Hide diagnostics</string>
+
     <!-- Diagnostics -->
-    <string name="diagnostics_title">Diagnostics</string>
     <string name="diagnostics_explanation">What the app knows about its own state. If something misbehaves, copy this and send it along.</string>
     <string name="copy_diagnostics">Copy diagnostics</string>
     <string name="refresh">Refresh</string>

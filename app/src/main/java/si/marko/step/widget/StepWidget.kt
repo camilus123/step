@@ -45,6 +45,7 @@ import si.marko.step.MainActivity
 import si.marko.step.R
 import si.marko.step.core.Goal
 import java.text.NumberFormat
+import java.time.LocalDate
 
 /**
  * Home screen widget with today's steps.
@@ -69,8 +70,8 @@ open class StepWidget : GlanceAppWidget() {
         // from a process whose service has died cannot survive, e.g. across midnight.
         loadFromDatabase(context)
         provideContent {
-            val steps by today.collectAsState()
-            GlanceTheme { Content(steps ?: 0, Goal.DEFAULT) }
+            val shown by today.collectAsState()
+            GlanceTheme { Content(shown?.steps ?: 0, shown?.goal ?: Goal.DEFAULT) }
         }
     }
 
@@ -168,17 +169,20 @@ open class StepWidget : GlanceAppWidget() {
 
         private val GOAL_REACHED_GREEN = Color(0xFF2E9E4F)
 
-        /** Today's steps as the widget shows them. Null until first loaded in this process. */
-        private val today = MutableStateFlow<Long?>(null)
+        private data class Shown(val steps: Long, val goal: Int)
+
+        /** Today's steps and goal as the widget shows them. Null until first loaded in this process. */
+        private val today = MutableStateFlow<Shown?>(null)
 
         private suspend fun loadFromDatabase(context: Context) {
             val repository = AppGraph.get(context).repository
-            today.value = repository.dayTotalOnce(repository.todayEpochDay())
+            val day = repository.todayEpochDay()
+            today.value = Shown(repository.dayTotalOnce(day), repository.goalHistory().goalOn(LocalDate.ofEpochDay(day)))
         }
 
-        /** Called by the counting service with the number it has just put in the notification. */
-        suspend fun show(context: Context, steps: Long) {
-            today.value = steps
+        /** Called by the counting service with the numbers it has just put in the notification. */
+        suspend fun show(context: Context, steps: Long, goal: Int) {
+            today.value = Shown(steps, goal)
             updateEverySize(context)
         }
 

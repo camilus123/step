@@ -71,6 +71,8 @@ dependencies {
     implementation(libs.androidx.work.runtime)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.androidx.glance.appwidget)
+    // Used without its compiler plugin: the backup file is built and read as plain JSON elements.
+    implementation(libs.kotlinx.serialization.json)
 
     testImplementation(libs.junit)
 }

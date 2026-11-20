@@ -87,6 +87,28 @@ abstract class StepDao {
     @Query("SELECT * FROM goal_history")
     abstract suspend fun goalChanges(): List<GoalChange>
 
+    @Query("SELECT * FROM goal_history")
+    abstract fun goalChangesFlow(): Flow<List<GoalChange>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    abstract suspend fun saveGoalChange(change: GoalChange)
+
+    @Query("SELECT * FROM hourly_steps ORDER BY epochDay, hour")
+    abstract suspend fun allHours(): List<HourlySteps>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    protected abstract suspend fun replaceHours(rows: List<HourlySteps>)
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    protected abstract suspend fun addGoalChanges(rows: List<GoalChange>)
+
+    /** Writes the result of an import: all of it, or nothing. */
+    @Transaction
+    open suspend fun applyImport(hours: List<HourlySteps>, goals: List<GoalChange>) {
+        replaceHours(hours)
+        addGoalChanges(goals)
+    }
+
     @Query("SELECT COUNT(DISTINCT epochDay) FROM hourly_steps WHERE steps > 0")
     abstract suspend fun daysWithSteps(): Int
 }

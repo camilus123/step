@@ -142,6 +142,11 @@ class StatsTest {
         )
         // Tue 6000 < 10000 no; Wed 10000 yes; Thu 6000 >= 5000 yes; Fri 4999 < 5000 no.
         assertEquals(2, stats.goalDays)
+        // The line shows the goal of the latest day that has begun: today, Friday.
+        assertEquals(5_000, stats.goalLine)
+        // For a week that is over, that is its Sunday.
+        val earlier = StatsCalculator.compute(week.shifted(-1), emptyMap(), d("2026-11-20"), d("2026-11-01"), history)
+        assertEquals(10_000, earlier.goalLine)
     }
 
     // ---- month and year --------------------------------------------------------------------
