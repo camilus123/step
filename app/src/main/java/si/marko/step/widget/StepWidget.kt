@@ -62,7 +62,7 @@ import java.text.NumberFormat
  */
 open class StepWidget : GlanceAppWidget() {
 
-    override val sizeMode = SizeMode.Responsive(setOf(SMALL, WIDE, LARGE))
+    override val sizeMode = SizeMode.Responsive(setOf(SMALL, WIDE, LARGE, FULL_WIDTH))
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         // A fresh look at the database every time the widget (re)starts, so that a stale number
@@ -82,6 +82,10 @@ open class StepWidget : GlanceAppWidget() {
         val reached = Goal.reached(steps, goal)
         val showProgress = size.width >= WIDE.width
         val large = showProgress && size.height >= LARGE.height
+        val number = numbers.format(steps)
+        // The word "steps" next to the number only where there is room for both: in the
+        // square 2 x 2 widget it was cut off, so there it goes on a line of its own.
+        val labelBeside = showProgress && !(large && size.width < FULL_WIDTH.width)
 
         Column(
             modifier = GlanceModifier
@@ -96,14 +100,17 @@ open class StepWidget : GlanceAppWidget() {
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = numbers.format(steps),
+                    text = number,
                     maxLines = 1,
                     style = TextStyle(
                         color = GlanceTheme.colors.onSurface,
                         fontSize = when {
                             large -> 34.sp
                             showProgress -> 24.sp
-                            else -> 18.sp
+                            // One cell: shrink with the length so "12,345" still fits.
+                            number.length <= 5 -> 18.sp
+                            number.length == 6 -> 15.sp
+                            else -> 13.sp
                         },
                         fontWeight = FontWeight.Bold,
                     ),
@@ -119,7 +126,7 @@ open class StepWidget : GlanceAppWidget() {
                         ),
                     )
                 }
-                if (showProgress) {
+                if (labelBeside) {
                     Spacer(GlanceModifier.width(6.dp))
                     Text(
                         text = context.getString(R.string.widget_steps_label),
@@ -127,6 +134,13 @@ open class StepWidget : GlanceAppWidget() {
                         style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 13.sp),
                     )
                 }
+            }
+            if (showProgress && !labelBeside) {
+                Text(
+                    text = context.getString(R.string.widget_steps_label),
+                    maxLines = 1,
+                    style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 14.sp),
+                )
             }
             if (showProgress) {
                 Spacer(GlanceModifier.height(if (large) 8.dp else 4.dp))
@@ -150,6 +164,7 @@ open class StepWidget : GlanceAppWidget() {
         private val SMALL = DpSize(40.dp, 40.dp)
         private val WIDE = DpSize(110.dp, 40.dp)
         private val LARGE = DpSize(110.dp, 110.dp)
+        private val FULL_WIDTH = DpSize(250.dp, 110.dp)
 
         private val GOAL_REACHED_GREEN = Color(0xFF2E9E4F)
 

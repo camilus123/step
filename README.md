@@ -13,8 +13,8 @@ The app is being built in stages, each delivered as an installable APK.
 |---|---|---|
 | 1 | Project skeleton, signed CI build, raw sensor readout, diagnostics | done, confirmed on the 17T |
 | 2 | Background service, storage, correct counting, lock screen notification | done, confirmed on the 17T |
-| 3 | Home screen widget | **this build** |
-| 4 | Statistics per week, month and year | planned |
+| 3 | Home screen widget | done, confirmed on the 17T |
+| 4 | Statistics per week, month and year | **this build** |
 | 5 | Daily goal setting, export and import, HyperOS setup guide, polish | planned |
 
 ### What works now
@@ -27,8 +27,10 @@ The app is being built in stages, each delivered as an installable APK.
   percentage and a progress bar. They follow the system colours and light or dark mode.
 - Counting restarts after a reboot and after an app update, and a watchdog checks every half
   hour that it is still running.
-- The app screen shows today's count and goal progress, plus diagnostics with a
-  **Copy diagnostics** button.
+- The app has three tabs. **Today**: the count, goal progress and a bar chart of the day by
+  hour. **Statistics**: week, month or year with a bar chart, total, daily average, best day and
+  the number of days the goal was reached; the arrows move to earlier periods. **Settings**: for
+  now the diagnostics with a **Copy diagnostics** button.
 
 The goal is fixed at 10 000 steps until settings arrive in stage 5.
 
@@ -74,7 +76,7 @@ widget be resized, so it comes in four fixed sizes, each its own entry in the pi
 |---|---|
 | Step count 1 × 1 | only the number |
 | Step count 2 × 1 | number, progress bar, goal percentage |
-| Step count 2 × 2 | the same with a larger number |
+| Step count 2 × 2 | the same with a larger number and "steps" on its own line |
 | Step count 4 × 1 | the same with the progress bar across the full width |
 
 Tapping a widget opens the app. The counting service updates the widgets whenever the count
@@ -111,6 +113,19 @@ of them can be resized and adapts its layout.
 
 The rules live in `app/src/main/java/si/marko/step/core/StepAccountant.kt` and are covered by
 unit tests.
+
+## Statistics
+
+- A week runs from Monday to Sunday. Week and month show one bar per day, the year one bar per
+  month. Tap a bar to read its value. The dashed line is the daily goal.
+- Days without steps are shown, and counted, as zero.
+- **Daily average** and **goal reached on x of y days** are taken over the days of the period
+  that have already begun and are not earlier than the first day the app recorded steps. So a
+  week that is three days old is averaged over three days, and the days before the app was
+  installed do not drag the first week down.
+- **Best day** is always a single day, also in the year view.
+- The sensor on the 17T reports steps in batches of about ten, so the count moves in jumps; the
+  totals are exact.
 
 ## Export and import
 

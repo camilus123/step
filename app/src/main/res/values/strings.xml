@@ -9,6 +9,27 @@
     <string name="today">Today</string>
     <string name="goal_reached_mark">✓</string>
 
+    <!-- Navigation -->
+    <string name="tab_today">Today</string>
+    <string name="tab_stats">Statistics</string>
+    <string name="tab_settings">Settings</string>
+
+    <!-- Charts and statistics -->
+    <string name="by_hour">By hour</string>
+    <string name="chart_hint">Tap a bar to see its value</string>
+    <string name="hour_value">%1$02d:00 – %2$02d:00: %3$s steps</string>
+    <string name="bar_value">%1$s: %2$s steps</string>
+    <string name="stats_week">Week</string>
+    <string name="stats_month">Month</string>
+    <string name="stats_year">Year</string>
+    <string name="stats_earlier">Earlier</string>
+    <string name="stats_later">Later</string>
+    <string name="stats_total">Total</string>
+    <string name="stats_average">Daily average</string>
+    <string name="stats_best_day">Best day</string>
+    <string name="stats_goal_days">Goal reached</string>
+    <string name="stats_goal_days_value">%1$d of %2$d days</string>
+
     <!-- Notification channel -->
     <string name="channel_steps_name">Step count</string>
     <string name="channel_steps_description">Always-on notification with today\'s steps, without sound or vibration. It also keeps counting alive in the background.</string>
@@ -33,6 +54,7 @@
 
     <!-- Diagnostics -->
     <string name="diagnostics_title">Diagnostics</string>
+    <string name="diagnostics_explanation">What the app knows about its own state. If something misbehaves, copy this and send it along.</string>
     <string name="copy_diagnostics">Copy diagnostics</string>
     <string name="refresh">Refresh</string>
     <string name="diagnostics_copied">Diagnostics copied</string>

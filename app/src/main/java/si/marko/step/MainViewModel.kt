@@ -22,8 +22,13 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import si.marko.step.core.Goal
+import si.marko.step.core.Period
+import si.marko.step.core.PeriodKind
+import si.marko.step.core.PeriodStats
+import si.marko.step.core.StatsCalculator
 import si.marko.step.diag.DiagSection
 import si.marko.step.diag.DiagnosticsReport
 import si.marko.step.diag.EventLog
@@ -47,6 +52,39 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     /** Today's steps, live from the database. */
     @OptIn(ExperimentalCoroutinesApi::class)
     val todaySteps: Flow<Long> = day.flatMapLatest { graph.repository.dayTotal(it) }
+
+    /** Today's steps per hour: always 24 values. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val todayHours: Flow<List<Long>> =
+        day.flatMapLatest { graph.repository.hoursOfDay(it) }.map(StatsCalculator::hourly)
+
+    // ---- statistics --------------------------------------------------------------------
+
+    private val statsPeriod = MutableStateFlow(Period.containing(PeriodKind.WEEK, LocalDate.now()))
+
+    /** The figures for the week, month or year being looked at; follows the database live. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val stats: Flow<PeriodStats> = statsPeriod.flatMapLatest { period ->
+        graph.repository.dayTotals(period.start, period.end).map { totals ->
+            StatsCalculator.compute(
+                period = period,
+                dayTotals = totals,
+                today = LocalDate.now(),
+                firstRecordedDay = graph.repository.firstDayWithSteps(),
+                goals = graph.repository.goalHistory(),
+            )
+        }
+    }
+
+    fun showStats(kind: PeriodKind) {
+        if (statsPeriod.value.kind != kind) statsPeriod.value = Period.containing(kind, LocalDate.now())
+    }
+
+    /** Earlier (negative) or later (positive) period. Never beyond the current one. */
+    fun moveStats(by: Long) {
+        val target = statsPeriod.value.shifted(by)
+        if (target.start <= LocalDate.now()) statsPeriod.value = target
+    }
 
     val serviceRunning = ServiceStatus.running
     val goal: Int = Goal.DEFAULT

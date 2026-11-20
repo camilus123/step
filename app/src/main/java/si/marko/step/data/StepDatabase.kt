@@ -35,6 +35,10 @@ data class CounterStateRow(
 @Entity(tableName = "goal_history")
 data class GoalChange(@PrimaryKey val fromEpochDay: Long, val goal: Int)
 
+data class DayTotal(val epochDay: Long, val steps: Long)
+
+data class HourTotal(val hour: Int, val steps: Long)
+
 @Dao
 abstract class StepDao {
 
@@ -69,6 +73,19 @@ abstract class StepDao {
 
     @Query("SELECT COALESCE(SUM(steps), 0) FROM hourly_steps")
     abstract suspend fun allTimeTotal(): Long
+
+    /** Totals of the days in the range that have any rows. Days without rows are simply absent. */
+    @Query("SELECT epochDay, SUM(steps) AS steps FROM hourly_steps WHERE epochDay BETWEEN :fromEpochDay AND :toEpochDay GROUP BY epochDay")
+    abstract fun dayTotals(fromEpochDay: Long, toEpochDay: Long): Flow<List<DayTotal>>
+
+    @Query("SELECT hour, steps FROM hourly_steps WHERE epochDay = :epochDay")
+    abstract fun hoursOfDay(epochDay: Long): Flow<List<HourTotal>>
+
+    @Query("SELECT MIN(epochDay) FROM hourly_steps WHERE steps > 0")
+    abstract suspend fun firstDayWithSteps(): Long?
+
+    @Query("SELECT * FROM goal_history")
+    abstract suspend fun goalChanges(): List<GoalChange>
 
     @Query("SELECT COUNT(DISTINCT epochDay) FROM hourly_steps WHERE steps > 0")
     abstract suspend fun daysWithSteps(): Int

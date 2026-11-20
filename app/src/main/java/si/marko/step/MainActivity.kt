@@ -14,7 +14,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import si.marko.step.ui.DiagnosticsScreen
+import si.marko.step.ui.MainScreen
 import si.marko.step.ui.StepTheme
 
 class MainActivity : ComponentActivity() {
@@ -29,7 +29,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             StepTheme {
-                DiagnosticsScreen(
+                MainScreen(
                     vm = vm,
                     onRequestPermissions = { permissionLauncher.launch(vm.missingPermissions()) },
                     onOpenAppSettings = ::openAppSettings,
